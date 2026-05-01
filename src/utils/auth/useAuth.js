@@ -3,7 +3,7 @@ import SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import { Modal, View } from 'react-native';
-import { useAuthModal, useAuthStore, authKey } from './store';
+import { useAuthModal, useAuthStore, authKey, onboardingKey } from './store';
 
 
 /**
@@ -13,7 +13,7 @@ import { useAuthModal, useAuthStore, authKey } from './store';
  * directly.
  */
 export const useAuth = () => {
-  const { isReady, auth, setAuth } = useAuthStore();
+  const { isReady, auth, setAuth, onboardingCompleted, setOnboardingCompleted } = useAuthStore();
   const { isOpen, close, open } = useAuthModal();
 
   const initiate = useCallback(() => {
@@ -25,15 +25,20 @@ export const useAuth = () => {
       });
       return;
     }
-    SecureStore.getItemAsync(authKey).then((auth) => {
+    Promise.all([
+      SecureStore.getItemAsync(authKey),
+      SecureStore.getItemAsync(onboardingKey),
+    ]).then(([auth, onboarding]) => {
       useAuthStore.setState({
         auth: auth ? JSON.parse(auth) : null,
+        onboardingCompleted: onboarding === 'true',
         isReady: true,
       });
     }).catch((error) => {
       console.warn('Failed to retrieve auth from SecureStore:', error);
       useAuthStore.setState({
         auth: null,
+        onboardingCompleted: false,
         isReady: true,
       });
     });
@@ -56,11 +61,13 @@ export const useAuth = () => {
   return {
     isReady,
     isAuthenticated: isReady ? !!auth : null,
+    onboardingCompleted,
     signIn,
     signOut,
     signUp,
     auth,
     setAuth,
+    setOnboardingCompleted,
     initiate,
   };
 };

@@ -1,5 +1,7 @@
 import { Redirect } from "expo-router";
+import { useAuth } from "@/utils/auth/useAuth";
 
 export default function Index() {
-  return <Redirect href="/onboarding" />;
+  const { onboardingCompleted } = useAuth();
+  return <Redirect href={onboardingCompleted ? "/(tabs)" : "/onboarding"} />;
 }

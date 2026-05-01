@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 
 export const authKey = `${process.env.EXPO_PUBLIC_PROJECT_GROUP_ID}-jwt`;
+export const onboardingKey = `${process.env.EXPO_PUBLIC_PROJECT_GROUP_ID}-onboarding-completed`;
 
 /**
  * This store manages the authentication state of the application.
@@ -9,6 +10,7 @@ export const authKey = `${process.env.EXPO_PUBLIC_PROJECT_GROUP_ID}-jwt`;
 export const useAuthStore = create((set) => ({
   isReady: false,
   auth: null,
+  onboardingCompleted: false,
   setAuth: (auth) => {
     if (auth) {
       SecureStore.setItemAsync(authKey, JSON.stringify(auth));
@@ -16,6 +18,11 @@ export const useAuthStore = create((set) => ({
       SecureStore.deleteItemAsync(authKey);
     }
     set({ auth });
+  },
+  setOnboardingCompleted: (completed) => {
+    const value = !!completed;
+    SecureStore.setItemAsync(onboardingKey, value ? 'true' : 'false');
+    set({ onboardingCompleted: value });
   },
 }));
 

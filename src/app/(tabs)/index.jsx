@@ -1,8 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  Pressable,
+  Animated,
+  Easing,
+  Platform,
+  Linking,
+} from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import {
   AppShell,
   Input,
@@ -10,7 +24,16 @@ import {
   COLORS,
   Button,
 } from "../../components/DesignSystem";
-import { Activity, CalendarCheck, Flame, Trophy, Route } from "lucide-react-native";
+import {
+  Activity,
+  ArrowRight,
+  CalendarCheck,
+  Flame,
+  Route,
+  Sparkles,
+  Star,
+  Trophy,
+} from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   parseTimeToSeconds,
@@ -35,6 +58,9 @@ export default function CalculatorScreen() {
   const [pace, setPace] = useState("05:00");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showPacePicker, setShowPacePicker] = useState(false);
+  const [showRatePrompt, setShowRatePrompt] = useState(false);
+  const promptOpacity = useRef(new Animated.Value(0)).current;
+  const promptScale = useRef(new Animated.Value(0.96)).current;
   const [dashboard, setDashboard] = useState({
     weekOverview: "No active plan",
     streak: "0 days in a row",
@@ -55,6 +81,52 @@ export default function CalculatorScreen() {
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timer;
+
+    const schedulePrompt = async () => {
+      try {
+        if (!active) {
+          return;
+        }
+
+        timer = setTimeout(async () => {
+          if (!active) {
+            return;
+          }
+
+          setShowRatePrompt(true);
+          Animated.parallel([
+            Animated.timing(promptOpacity, {
+              toValue: 1,
+              duration: 240,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.spring(promptScale, {
+              toValue: 1,
+              tension: 72,
+              friction: 9,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }, 5000);
+      } catch (error) {
+        console.warn("Failed to schedule rate prompt:", error);
+      }
+    };
+
+    schedulePrompt();
+
+    return () => {
+      active = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [promptOpacity, promptScale]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -229,6 +301,40 @@ export default function CalculatorScreen() {
     }
   };
 
+  const closeRatePrompt = () => {
+    Haptics.selectionAsync();
+    setShowRatePrompt(false);
+  };
+
+  const openStore = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const storeUrl = Platform.select({
+      android: "market://details?id=com.marathonplanner.app",
+      ios: "https://apps.apple.com/us/search?term=Marathon%20Planner",
+      default: "https://play.google.com/store/apps/details?id=com.marathonplanner.app",
+    });
+
+    const fallbackUrl = Platform.select({
+      android: "https://play.google.com/store/apps/details?id=com.marathonplanner.app",
+      ios: "https://apps.apple.com/us/search?term=Marathon%20Planner",
+      default: "https://play.google.com/store/apps/details?id=com.marathonplanner.app",
+    });
+
+    try {
+      setShowRatePrompt(false);
+      promptOpacity.setValue(0);
+      promptScale.setValue(0.96);
+      await Linking.openURL(storeUrl);
+    } catch (error) {
+      try {
+        await Linking.openURL(fallbackUrl);
+      } catch (fallbackError) {
+        console.warn("Failed to open store link:", fallbackError);
+      }
+    }
+  };
+
   const parsedTimeValue = (() => {
     const secs = parseTimeToSeconds(time);
     const d = new Date();
@@ -246,6 +352,7 @@ export default function CalculatorScreen() {
   })();
 
   return (
+    <>
     <AppShell title="Calculator" subtitle="Pace Tools">
       <View style={{ marginBottom: 24 }}>
         <Pill
@@ -382,6 +489,68 @@ export default function CalculatorScreen() {
         />
       </View>
     </AppShell>
+
+    <Modal
+      visible={showRatePrompt}
+      transparent
+      animationType="none"
+      onRequestClose={closeRatePrompt}
+    >
+      <View style={styles.rateOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeRatePrompt} />
+        <Animated.View
+          style={[
+            styles.rateCard,
+            {
+              opacity: promptOpacity,
+              transform: [{ scale: promptScale }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={["rgba(255,106,44,0.30)", "rgba(15,23,42,0.96)", "#020617"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={styles.rateGlow} />
+
+          <View style={styles.rateTopRow}>
+            
+          </View>
+
+          <View style={styles.starHeroWrap}>
+            <View style={styles.starHeroRow}>
+              {[1, 2, 3, 4, 5].map((item) => (
+                <View key={item} style={styles.starHeroPill}>
+                  <Star size={18} color="#FFB547" fill="#FFB547" />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <Text style={styles.rateTitle}>Enjoying Marathon Planner?</Text>
+          <Text style={styles.rateBody}>
+            If the app is helping your runs, a quick rating on the store would help a lot.
+          </Text>
+
+          <View style={styles.rateStatsRow}>
+           
+          </View>
+
+          <View style={styles.rateActions}>
+            <Pressable style={styles.ratePrimaryAction} onPress={openStore}>
+              <Text style={styles.ratePrimaryActionText}>Rate Now</Text>
+              <ArrowRight size={18} color="#0F172A" />
+            </Pressable>
+            <Pressable style={styles.rateSecondaryAction} onPress={closeRatePrompt}>
+              <Text style={styles.rateSecondaryActionText}>Not Now</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -478,4 +647,161 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: COLORS.foreground,
   },
+  rateOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(2, 6, 23, 0.76)",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  rateCard: {
+    borderRadius: 32,
+    overflow: "hidden",
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "#0F172A",
+    shadowColor: "#000",
+    shadowOpacity: 0.34,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 20 },
+    elevation: 20,
+  },
+  rateGlow: {
+    position: "absolute",
+    top: -72,
+    right: -72,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(255,106,44,0.24)",
+  },
+  rateTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  rateBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#FFF7ED",
+    alignSelf: "center",
+  },
+  rateBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0F172A",
+    letterSpacing: 0.6,
+  },
+  rateMeta: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  starHeroWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  starHeroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 11,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderRadius: 30,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  starHeroPill: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.11)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rateTitle: {
+    fontSize: 29,
+    lineHeight: 33,
+    color: "#FFFFFF",
+    fontWeight: "800",
+    letterSpacing: -0.8,
+    textAlign: "center",
+  },
+  rateBody: {
+    marginTop: 11,
+    fontSize: 15,
+    lineHeight: 23,
+    color: "#CBD5E1",
+    textAlign: "center",
+  },
+  rateStatsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
+  },
+  rateStat: {
+    flex: 1,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+  },
+  rateStatValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  rateStatLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#94A3B8",
+    textAlign: "center",
+  },
+  rateActions: {
+    gap: 12,
+    marginTop: 20,
+  },
+  ratePrimaryAction: {
+    minHeight: 58,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+  },
+  ratePrimaryActionText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#0F172A",
+    letterSpacing: 0.2,
+  },
+  rateSecondaryAction: {
+    minHeight: 50,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  rateSecondaryActionText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#E2E8F0",
+  }
 });

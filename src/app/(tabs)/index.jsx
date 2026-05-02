@@ -27,12 +27,15 @@ import {
 import {
   Activity,
   ArrowRight,
+  Zap,
   CalendarCheck,
   Flame,
   Route,
   Sparkles,
   Star,
   Trophy,
+  Check,
+  Lock,
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -59,8 +62,11 @@ export default function CalculatorScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showPacePicker, setShowPacePicker] = useState(false);
   const [showRatePrompt, setShowRatePrompt] = useState(false);
+  const [showPremium, setShowPremium] = useState(false);
   const promptOpacity = useRef(new Animated.Value(0)).current;
   const promptScale = useRef(new Animated.Value(0.96)).current;
+  const premiumOpacity = useRef(new Animated.Value(0)).current;
+  const premiumScale = useRef(new Animated.Value(0.92)).current;
   const [dashboard, setDashboard] = useState({
     weekOverview: "No active plan",
     streak: "0 days in a row",
@@ -306,6 +312,42 @@ export default function CalculatorScreen() {
     setShowRatePrompt(false);
   };
 
+  const openPremium = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowPremium(true);
+    Animated.parallel([
+      Animated.timing(premiumOpacity, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(premiumScale, {
+        toValue: 1,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closePremium = () => {
+    Haptics.selectionAsync();
+    Animated.parallel([
+      Animated.timing(premiumOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.spring(premiumScale, {
+        toValue: 0.92,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setShowPremium(false));
+  };
+
   const openStore = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -478,6 +520,18 @@ export default function CalculatorScreen() {
 
       <View style={{ gap: 12, marginTop: 20 }}>
         <Button title="Set as Race Goal" onPress={handleSetGoalRace} />
+        <Pressable style={styles.premiumButton} onPress={openPremium}>
+          <LinearGradient
+            colors={["#FF6A2C", "#FF8A4C"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.premiumGradient}
+          >
+            <Lock size={16} color="#FFFFFF" />
+            <Text style={styles.premiumButtonText}>Unlock Premium</Text>
+            <Zap size={16} color="#FFFFFF" />
+          </LinearGradient>
+        </Pressable>
         <Button
           title="Clear All"
           type="secondary"
@@ -545,6 +599,90 @@ export default function CalculatorScreen() {
             </Pressable>
             <Pressable style={styles.rateSecondaryAction} onPress={closeRatePrompt}>
               <Text style={styles.rateSecondaryActionText}>Not Now</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+    
+    <Modal
+      visible={showPremium}
+      transparent
+      animationType="none"
+      onRequestClose={closePremium}
+    >
+      <View style={styles.premiumOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closePremium} />
+        <Animated.View
+          style={[
+            styles.premiumCard,
+            {
+              opacity: premiumOpacity,
+              transform: [{ scale: premiumScale }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={["rgba(255,106,44,0.40)", "rgba(15,23,42,0.98)", "#020617"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={styles.premiumGlowTop} />
+          
+          <View style={styles.premiumHeader}>
+            <Text style={styles.premiumBadge}>MARATHON PLANNER PRO</Text>
+            <Text style={styles.premiumTitle}>Level Up Your Training</Text>
+            <Text style={styles.premiumSubtitle}>Get advanced analytics, AI coaching, and unlimited plans</Text>
+          </View>
+          
+          <View style={styles.premiumBenefitsList}>
+            {[
+              { icon: Zap, text: "AI-Powered Training Plans" },
+              { icon: Activity, text: "Real-Time Performance Analytics" },
+              { icon: Trophy, text: "Unlimited Race Goals" },
+              { icon: Check, text: "Advanced Injury Prevention" },
+              { icon: Star, text: "Priority Support" },
+            ].map((benefit, idx) => (
+              <View key={idx} style={styles.premiumBenefitItem}>
+                <View style={styles.premiumBenefitIcon}>
+                  <benefit.icon size={16} color="#FF6A2C" />
+                </View>
+                <Text style={styles.premiumBenefitText}>{benefit.text}</Text>
+              </View>
+            ))}
+          </View>
+          
+          <View style={styles.premiumPlansContainer}>
+            <View style={[styles.premiumPlan, styles.planBasic]}>
+              <Text style={styles.planPrice}>$0</Text>
+              <Text style={styles.planName}>Free</Text>
+              <Text style={styles.planDesc}>Basic features</Text>
+            </View>
+            <View style={[styles.premiumPlan, styles.planPro]}>
+              <View style={styles.planBadge}>
+                <Text style={styles.planBadgeText}>BEST</Text>
+              </View>
+              <Text style={styles.planPrice}>$4.99</Text>
+              <Text style={styles.planName}>Pro</Text>
+              <Text style={styles.planDesc}>All premium features</Text>
+            </View>
+          </View>
+          
+          <View style={styles.premiumActions}>
+            <Pressable style={styles.premiumCTA} onPress={closePremium}>
+              <LinearGradient
+                colors={["#FF6A2C", "#FF8A4C"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.premiumCTAGradient}
+              >
+                <Text style={styles.premiumCTAText}>Get Premium</Text>
+                <ArrowRight size={16} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+            <Pressable style={styles.premiumSecondary} onPress={closePremium}>
+              <Text style={styles.premiumSecondaryText}>Maybe Later</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -803,5 +941,202 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#E2E8F0",
-  }
+  },
+  premiumButton: {
+    borderRadius: 14,
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#FF6A2C",
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  premiumGradient: {
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  premiumButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  premiumOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(2, 6, 23, 0.80)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  premiumCard: {
+    borderRadius: 40,
+    overflow: "hidden",
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "#0F172A",
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 30 },
+    elevation: 30,
+    maxHeight: "85%",
+  },
+  premiumGlowTop: {
+    position: "absolute",
+    top: -100,
+    left: -50,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(255,106,44,0.30)",
+    opacity: 0.5,
+  },
+  premiumHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  premiumBadge: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#FF6A2C",
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  premiumTitle: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    textAlign: "center",
+    lineHeight: 38,
+    letterSpacing: -0.8,
+    marginBottom: 8,
+  },
+  premiumSubtitle: {
+    fontSize: 15,
+    color: "#CBD5E1",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  premiumBenefitsList: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  premiumBenefitItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  premiumBenefitIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,106,44,0.20)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  premiumBenefitText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#E2E8F0",
+    flex: 1,
+  },
+  premiumPlansContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
+  premiumPlan: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+  },
+  planBasic: {
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  planPro: {
+    borderColor: "rgba(255,106,44,0.40)",
+    backgroundColor: "rgba(255,106,44,0.08)",
+  },
+  planBadge: {
+    position: "absolute",
+    top: -10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#FF6A2C",
+  },
+  planBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  planPrice: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginTop: 4,
+  },
+  planName: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#94A3B8",
+    marginTop: 2,
+  },
+  planDesc: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  premiumActions: {
+    gap: 12,
+  },
+  premiumCTA: {
+    borderRadius: 18,
+    overflow: "hidden",
+    elevation: 8,
+  },
+  premiumCTAGradient: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  premiumCTAText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  premiumSecondary: {
+    minHeight: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  premiumSecondaryText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#CBD5E1",
+  },
 });

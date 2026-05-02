@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const authKey = `${process.env.EXPO_PUBLIC_PROJECT_GROUP_ID}-jwt`;
 export const onboardingKey = `${process.env.EXPO_PUBLIC_PROJECT_GROUP_ID}-onboarding-completed`;
@@ -21,8 +22,8 @@ export const useAuthStore = create((set) => ({
   },
   setOnboardingCompleted: (completed) => {
     const value = !!completed;
-    SecureStore.setItemAsync(onboardingKey, value ? 'true' : 'false');
     set({ onboardingCompleted: value });
+    return AsyncStorage.setItem(onboardingKey, value ? 'true' : 'false');
   },
 }));
 

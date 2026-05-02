@@ -1,9 +1,6 @@
-import { router } from 'expo-router';
-import SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useMemo } from 'react';
-import { create } from 'zustand';
-import { Modal, View } from 'react-native';
-import { useAuthModal, useAuthStore, authKey, onboardingKey } from './store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect } from 'react';
+import { useAuthModal, useAuthStore, onboardingKey } from './store';
 
 
 /**
@@ -17,31 +14,22 @@ export const useAuth = () => {
   const { isOpen, close, open } = useAuthModal();
 
   const initiate = useCallback(() => {
-    if (!SecureStore?.getItemAsync) {
-      console.warn('SecureStore not available, skipping auth initialization');
-      useAuthStore.setState({
-        auth: null,
-        isReady: true,
+    AsyncStorage.getItem(onboardingKey)
+      .then((onboarding) => {
+        useAuthStore.setState({
+          auth: null,
+          onboardingCompleted: onboarding === 'true',
+          isReady: true,
+        });
+      })
+      .catch((error) => {
+        console.warn('Failed to retrieve onboarding state from AsyncStorage:', error);
+        useAuthStore.setState({
+          auth: null,
+          onboardingCompleted: false,
+          isReady: true,
+        });
       });
-      return;
-    }
-    Promise.all([
-      SecureStore.getItemAsync(authKey),
-      SecureStore.getItemAsync(onboardingKey),
-    ]).then(([auth, onboarding]) => {
-      useAuthStore.setState({
-        auth: auth ? JSON.parse(auth) : null,
-        onboardingCompleted: onboarding === 'true',
-        isReady: true,
-      });
-    }).catch((error) => {
-      console.warn('Failed to retrieve auth from SecureStore:', error);
-      useAuthStore.setState({
-        auth: null,
-        onboardingCompleted: false,
-        isReady: true,
-      });
-    });
   }, []);
 
   useEffect(() => {}, []);

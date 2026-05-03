@@ -111,12 +111,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "400",
+    fontFamily: "Poppins-Regular",
     color: COLORS.foreground,
     letterSpacing: -0.64,
   },
   subtitle: {
     fontSize: 12,
     fontWeight: "500",
+    fontFamily: "Poppins-Medium",
     color: COLORS.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: 0.24,
@@ -142,6 +144,7 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 12,
     fontWeight: "500",
+    fontFamily: "Poppins-Medium",
     letterSpacing: 0.24,
   },
   inputContainer: {
@@ -150,6 +153,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: "400",
+    fontFamily: "Poppins-Regular",
     color: COLORS.mutedForeground,
     marginBottom: 6,
   },
@@ -160,6 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 12,
     fontSize: 16,
+    fontFamily: "Poppins-Regular",
     color: COLORS.foreground,
   },
   button: {
@@ -180,6 +185,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 14,
     fontWeight: "500",
+    fontFamily: "Poppins-Medium",
   },
   buttonTextPrimary: {
     color: "#FFFFFF",

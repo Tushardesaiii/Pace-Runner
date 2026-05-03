@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   },
   dashboardTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: COLORS.primary,
     marginBottom: 2,
   },
@@ -726,14 +726,14 @@ const styles = StyleSheet.create({
   },
   rateBadgeText: {
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "600",
     color: "#0F172A",
     letterSpacing: 0.6,
   },
   rateMeta: {
     fontSize: 11,
     color: "#94A3B8",
-    fontWeight: "700",
+    fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     fontSize: 29,
     lineHeight: 33,
     color: "#FFFFFF",
-    fontWeight: "800",
+    fontWeight: "600",
     letterSpacing: -0.8,
     textAlign: "center",
   },
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   },
   rateStatValue: {
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "600",
     color: "#FFFFFF",
   },
   rateStatLabel: {
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
   },
   ratePrimaryActionText: {
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "600",
     color: "#0F172A",
     letterSpacing: 0.2,
   },
@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
   },
   rateSecondaryActionText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: "#E2E8F0",
   },
   premiumButton: {
@@ -856,7 +856,7 @@ const styles = StyleSheet.create({
   premiumButtonText: {
     color: "#FFFFFF",
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "600",
     letterSpacing: 0.5,
   },
   premiumOverlay: {
@@ -897,14 +897,14 @@ const styles = StyleSheet.create({
   },
   premiumBadge: {
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "600",
     color: "#FF6A2C",
     letterSpacing: 1.2,
     marginBottom: 8,
   },
   premiumTitle: {
     fontSize: 32,
-    fontWeight: "800",
+    fontWeight: "600",
     color: "#FFFFFF",
     textAlign: "center",
     lineHeight: 38,
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
   },
   premiumBenefitText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     color: "#E2E8F0",
     flex: 1,
   },
@@ -976,19 +976,19 @@ const styles = StyleSheet.create({
   },
   planBadgeText: {
     fontSize: 9,
-    fontWeight: "900",
+    fontWeight: "600",
     color: "#FFFFFF",
     letterSpacing: 0.5,
   },
   planPrice: {
     fontSize: 24,
-    fontWeight: "800",
+    fontWeight: "600",
     color: "#FFFFFF",
     marginTop: 4,
   },
   planName: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: "#94A3B8",
     marginTop: 2,
   },
@@ -1015,7 +1015,7 @@ const styles = StyleSheet.create({
   },
   premiumCTAText: {
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "600",
     color: "#FFFFFF",
     letterSpacing: 0.5,
   },
@@ -1030,7 +1030,7 @@ const styles = StyleSheet.create({
   },
   premiumSecondaryText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: "#CBD5E1",
   },
 });

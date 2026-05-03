@@ -185,7 +185,7 @@ export default function UltimateOnboarding() {
           <ImageBackground 
             source={{ uri: 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070' }} 
             style={StyleSheet.absoluteFillObject}
-            imageStyle={{ opacity: 0.05 }}
+            imageStyle={{ opacity: 0.4 }}
           />
           <SafeAreaView style={styles.splashContent}>
             <Animated.View entering={FadeInDown.delay(100).springify().stiffness(200)}>
@@ -355,15 +355,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   // Splash Styles
   splashContent: { flex: 1, padding: 32, justifyContent: 'space-between' },
-  logo: { color: '#222222', fontSize: 16, fontWeight: '800', letterSpacing: 2, marginTop: 20 },
-  splashTitle: { color: '#222222', fontSize: 44, fontWeight: '700', marginTop: 20, lineHeight: 48, letterSpacing: -1 },
-  splashSub: { color: '#717171', fontSize: 18, marginTop: 16, lineHeight: 26, fontWeight: '400' },
+  logo: { color: '#222222', fontSize: 16, fontWeight: '600', fontFamily: 'Poppins-Medium', letterSpacing: 2, marginTop: 20 },
+  splashTitle: { color: '#222222', fontSize: 44, fontWeight: '600', fontFamily: 'Poppins-SemiBold', marginTop: 20, lineHeight: 48, letterSpacing: -1 },
+  splashSub: { color: '#717171', fontSize: 18, marginTop: 16, lineHeight: 26, fontWeight: '400', fontFamily: 'Poppins-Regular' },
   
   // Premium Button (Airbnb style: smaller, fully rounded or subtle rounded)
   buttonBase: { height: 52, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   buttonPrimary: { backgroundColor: '#222222' },
   buttonSecondary: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDDDDD' },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', fontFamily: 'Poppins-Medium' },
 
   // Nav
   navBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, height: 56, marginTop: 10 },
@@ -373,16 +373,16 @@ const styles = StyleSheet.create({
 
   slider: { flexDirection: 'row', width: SCREEN_WIDTH * 4, flex: 1 },
   page: { width: SCREEN_WIDTH, padding: 32, paddingTop: 10 },
-  hubTitle: { fontSize: 32, fontWeight: '700', color: '#222222', lineHeight: 38, letterSpacing: -0.5 },
-  hubSub: { fontSize: 16, color: '#717171', marginTop: 8, fontWeight: '400' },
+  hubTitle: { fontSize: 32, fontWeight: '600', fontFamily: 'Poppins-SemiBold', color: '#222222', lineHeight: 38, letterSpacing: -0.5 },
+  hubSub: { fontSize: 16, color: '#717171', marginTop: 8, fontWeight: '400', fontFamily: 'Poppins-Regular' },
 
   // Custom Inputs
   formContainer: { marginTop: 32, gap: 24 },
   inputContainer: { gap: 8 },
-  inputLabel: { fontSize: 14, fontWeight: '600', color: '#222222' },
+  inputLabel: { fontSize: 14, fontWeight: '600', fontFamily: 'Poppins-Medium', color: '#222222' },
   inputWrapper: { height: 56, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  input: { flex: 1, color: '#222222', fontSize: 16, fontWeight: '500', height: '100%' },
-  inputUnit: { color: '#717171', fontSize: 14, fontWeight: '500', marginLeft: 8 },
+  input: { flex: 1, color: '#222222', fontSize: 16, fontWeight: '500', fontFamily: 'Poppins-Regular', height: '100%' },
+  inputUnit: { color: '#717171', fontSize: 14, fontWeight: '500', fontFamily: 'Poppins-Medium', marginLeft: 8 },
   rowGrid: { flexDirection: 'row', gap: 12 },
 
   // Level Selection

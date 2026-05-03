@@ -8,7 +8,6 @@ import {
   Poppins_400Regular,
   Poppins_500Medium,
   Poppins_600SemiBold,
-  Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
 import { useAuth } from '@/utils/auth/useAuth';
 
@@ -25,7 +24,6 @@ export default function SignInScreen() {
     'Poppins-Regular': Poppins_400Regular,
     'Poppins-Medium': Poppins_500Medium,
     'Poppins-SemiBold': Poppins_600SemiBold,
-    'Poppins-Bold': Poppins_700Bold,
   });
 
   const handleAuth = async () => {
@@ -69,7 +67,7 @@ export default function SignInScreen() {
               <Text style={{ fontFamily: 'Poppins-SemiBold', marginLeft: 8, color: '#111827' }}>Back</Text>
             </Pressable>
 
-            <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 32, color: '#111827', marginBottom: 8, lineHeight: 40 }}>
+            <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 32, color: '#111827', marginBottom: 8, lineHeight: 40 }}>
               {mode === 'signin' ? 'Welcome Back' : 'Get Started'}
             </Text>
             <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 16, color: '#6B7280' }}>

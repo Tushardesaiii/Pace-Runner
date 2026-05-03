@@ -968,7 +968,7 @@ const styles = StyleSheet.create({
   },
   calendarTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: COLORS.primary,
   },
   streakLabel: {

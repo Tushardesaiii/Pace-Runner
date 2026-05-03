@@ -9,7 +9,8 @@ import {
   Calculator, 
   Calendar, 
   Trophy, 
-  Activity 
+  Activity,
+  Settings 
 } from "lucide-react-native";
 
 // Prevent splash screen from hiding until fonts load
@@ -75,6 +76,13 @@ export default function TabLayout() {
         options={{
           title: "Race",
           tabBarIcon: ({ color }) => <Trophy color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color }) => <Settings color={color} size={24} />,
         }}
       />
     </Tabs>

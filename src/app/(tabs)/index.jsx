@@ -44,6 +44,7 @@ import {
   formatSecondsToMmSs,
   safeNumber,
 } from "../../utils/runMath";
+import RatingBottomSheet from "../../components/RatingBottomSheet";
 
 const DAY_INDEX = {
   Mon: 0,
@@ -61,10 +62,8 @@ export default function CalculatorScreen() {
   const [pace, setPace] = useState("05:00");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showPacePicker, setShowPacePicker] = useState(false);
-  const [showRatePrompt, setShowRatePrompt] = useState(false);
+  const [showRatingSheet, setShowRatingSheet] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
-  const promptOpacity = useRef(new Animated.Value(0)).current;
-  const promptScale = useRef(new Animated.Value(0.96)).current;
   const premiumOpacity = useRef(new Animated.Value(0)).current;
   const premiumScale = useRef(new Animated.Value(0.92)).current;
   const [dashboard, setDashboard] = useState({
@@ -74,6 +73,41 @@ export default function CalculatorScreen() {
     nextWorkout: "No upcoming workout",
     achievement: "No runs logged yet",
   });
+
+  const openPremium = () => {
+    setShowPremium(true);
+    Animated.parallel([
+      Animated.timing(premiumOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(premiumScale, {
+        toValue: 1,
+        damping: 16,
+        stiffness: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closePremium = () => {
+    Animated.parallel([
+      Animated.timing(premiumOpacity, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(premiumScale, {
+        toValue: 0.92,
+        damping: 16,
+        stiffness: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setShowPremium(false));
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -103,21 +137,7 @@ export default function CalculatorScreen() {
             return;
           }
 
-          setShowRatePrompt(true);
-          Animated.parallel([
-            Animated.timing(promptOpacity, {
-              toValue: 1,
-              duration: 240,
-              easing: Easing.out(Easing.cubic),
-              useNativeDriver: true,
-            }),
-            Animated.spring(promptScale, {
-              toValue: 1,
-              tension: 72,
-              friction: 9,
-              useNativeDriver: true,
-            }),
-          ]).start();
+          setShowRatingSheet(true);
         }, 5000);
       } catch (error) {
         console.warn("Failed to schedule rate prompt:", error);
@@ -132,7 +152,7 @@ export default function CalculatorScreen() {
         clearTimeout(timer);
       }
     };
-  }, [promptOpacity, promptScale]);
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -307,76 +327,6 @@ export default function CalculatorScreen() {
     }
   };
 
-  const closeRatePrompt = () => {
-    Haptics.selectionAsync();
-    setShowRatePrompt(false);
-  };
-
-  const openPremium = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShowPremium(true);
-    Animated.parallel([
-      Animated.timing(premiumOpacity, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(premiumScale, {
-        toValue: 1,
-        tension: 60,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const closePremium = () => {
-    Haptics.selectionAsync();
-    Animated.parallel([
-      Animated.timing(premiumOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.spring(premiumScale, {
-        toValue: 0.92,
-        tension: 60,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setShowPremium(false));
-  };
-
-  const openStore = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    const storeUrl = Platform.select({
-      android: "market://details?id=com.marathonplanner.app",
-      ios: "https://apps.apple.com/us/search?term=Marathon%20Planner",
-      default: "https://play.google.com/store/apps/details?id=com.marathonplanner.app",
-    });
-
-    const fallbackUrl = Platform.select({
-      android: "https://play.google.com/store/apps/details?id=com.marathonplanner.app",
-      ios: "https://apps.apple.com/us/search?term=Marathon%20Planner",
-      default: "https://play.google.com/store/apps/details?id=com.marathonplanner.app",
-    });
-
-    try {
-      setShowRatePrompt(false);
-      promptOpacity.setValue(0);
-      promptScale.setValue(0.96);
-      await Linking.openURL(storeUrl);
-    } catch (error) {
-      try {
-        await Linking.openURL(fallbackUrl);
-      } catch (fallbackError) {
-        console.warn("Failed to open store link:", fallbackError);
-      }
-    }
-  };
-
   const parsedTimeValue = (() => {
     const secs = parseTimeToSeconds(time);
     const d = new Date();
@@ -544,66 +494,10 @@ export default function CalculatorScreen() {
       </View>
     </AppShell>
 
-    <Modal
-      visible={showRatePrompt}
-      transparent
-      animationType="none"
-      onRequestClose={closeRatePrompt}
-    >
-      <View style={styles.rateOverlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeRatePrompt} />
-        <Animated.View
-          style={[
-            styles.rateCard,
-            {
-              opacity: promptOpacity,
-              transform: [{ scale: promptScale }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={["rgba(255,106,44,0.30)", "rgba(15,23,42,0.96)", "#020617"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View style={styles.rateGlow} />
-
-          <View style={styles.rateTopRow}>
-            
-          </View>
-
-          <View style={styles.starHeroWrap}>
-            <View style={styles.starHeroRow}>
-              {[1, 2, 3, 4, 5].map((item) => (
-                <View key={item} style={styles.starHeroPill}>
-                  <Star size={18} color="#FFB547" fill="#FFB547" />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <Text style={styles.rateTitle}>Enjoying Marathon Planner?</Text>
-          <Text style={styles.rateBody}>
-            If the app is helping your runs, a quick rating on the store would help a lot.
-          </Text>
-
-          <View style={styles.rateStatsRow}>
-           
-          </View>
-
-          <View style={styles.rateActions}>
-            <Pressable style={styles.ratePrimaryAction} onPress={openStore}>
-              <Text style={styles.ratePrimaryActionText}>Rate Now</Text>
-              <ArrowRight size={18} color="#0F172A" />
-            </Pressable>
-            <Pressable style={styles.rateSecondaryAction} onPress={closeRatePrompt}>
-              <Text style={styles.rateSecondaryActionText}>Not Now</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
+    <RatingBottomSheet
+      isVisible={showRatingSheet}
+      onClose={() => setShowRatingSheet(false)}
+    />
     
     <Modal
       visible={showPremium}

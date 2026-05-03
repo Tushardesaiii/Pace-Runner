@@ -35,6 +35,19 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // --- Reusable Premium Components ---
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+const ProgressDot = ({ index, scrollX }) => {
+  const animatedDotStyle = useAnimatedStyle(() => {
+    const isActive = scrollX.value >= (index - 1.5) * SCREEN_WIDTH && scrollX.value < (index - 0.5) * SCREEN_WIDTH;
+
+    return {
+      width: withTiming(isActive ? 24 : 6, { duration: 200 }),
+      backgroundColor: withTiming(isActive ? '#222222' : '#DDDDDD', { duration: 200 }),
+    };
+  });
+
+  return <Animated.View style={[styles.dot, animatedDotStyle]} />;
+};
+
 const PremiumButton = ({ onPress, text, icon: Icon, isPrimary = true, style }) => {
   const scale = useSharedValue(1);
 
@@ -152,14 +165,7 @@ export default function UltimateOnboarding() {
   const renderIndicators = () => (
     <View style={styles.indicatorContainer}>
       {[1, 2, 3].map((i) => {
-        const animatedDotStyle = useAnimatedStyle(() => {
-          const isActive = scrollX.value >= (i - 1.5) * SCREEN_WIDTH && scrollX.value < (i - 0.5) * SCREEN_WIDTH;
-          return {
-            width: withTiming(isActive ? 24 : 6, { duration: 200 }),
-            backgroundColor: withTiming(isActive ? '#222222' : '#DDDDDD', { duration: 200 }),
-          };
-        });
-        return <Animated.View key={i} style={[styles.dot, animatedDotStyle]} />;
+        return <ProgressDot key={i} index={i} scrollX={scrollX} />;
       })}
     </View>
   );

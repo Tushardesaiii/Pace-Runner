@@ -26,8 +26,13 @@
     "androidStatusBar": {
       "hidden": false,
       "barStyle": "dark-content",
-      "backgroundColor": "#F8FAFC",
+      "backgroundColor": "#FFFFFF",
       "translucent": false
+    },
+    "androidNavigationBar": {
+      "visible": "sticky-immersive",
+      "barStyle": "dark-content",
+      "backgroundColor": "#FFFFFF"
     },
     "plugins": [
       [

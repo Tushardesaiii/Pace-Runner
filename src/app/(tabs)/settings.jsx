@@ -1,4 +1,21 @@
-import React, { useRef, useCallback, memo, useState } from "react";
+/**
+ * SettingsScreen — FAANG-grade minimal
+ *
+ * Dependencies (all Expo Go compatible):
+ *   expo-linear-gradient
+ *   react-native-safe-area-context
+ *
+ * No @gorhom/bottom-sheet, no lucide, no expo-haptics, no custom fonts.
+ * Every effect uses core React Native Animated API only.
+ */
+
+import React, {
+  useRef,
+  memo,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import {
   StyleSheet,
   Text,
@@ -8,268 +25,473 @@ import {
   StatusBar,
   Modal,
   Animated,
-  Dimensions,
+  PanResponder,
   Platform,
+  Dimensions,
+  BackHandler,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { height: H, width: W } = Dimensions.get("window");
 
-/* ─────────────────────────────────────────────
-   CHEVRON  (pure RN – no lucide dependency)
-───────────────────────────────────────────── */
-const Chevron = () => (
-  <View style={chevronStyles.wrap}>
-    <View style={[chevronStyles.bar, chevronStyles.top]} />
-    <View style={[chevronStyles.bar, chevronStyles.bottom]} />
+/* ─────────────────────────────────────────────────────────
+   DESIGN TOKENS
+───────────────────────────────────────────────────────── */
+const T = {
+  bg:          "#F2F2F7",
+  surface:     "#FFFFFF",
+  label:       "#000000",
+  sub:         "#8E8E93",
+  sep:         "#E5E5EA",
+  accent:      "#6366F1",
+  accentDeep:  "#4F46E5",
+  amber:       "#F59E0B",
+  dark:        "#0A0F1E",
+  darkMid:     "#1B2E50",
+  pressed:     "#F2F2F7",
+  radius:      14,
+  radiusLg:    20,
+  radiusXl:    26,
+};
+
+/* ─────────────────────────────────────────────────────────
+   SPRING PRESSABLE  — scale + opacity feedback
+───────────────────────────────────────────────────────── */
+const SpringPressable = ({ children, onPress, style, disabled }) => {
+  const scale   = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () => {
+    Animated.parallel([
+      Animated.spring(scale,   { toValue: 0.965, useNativeDriver: true, tension: 300, friction: 20 }),
+      Animated.timing(opacity, { toValue: 0.78,  useNativeDriver: true, duration: 80 }),
+    ]).start();
+  };
+
+  const pressOut = () => {
+    Animated.parallel([
+      Animated.spring(scale,   { toValue: 1,    useNativeDriver: true, tension: 300, friction: 20 }),
+      Animated.timing(opacity, { toValue: 1,    useNativeDriver: true, duration: 120 }),
+    ]).start();
+  };
+
+  return (
+    <Pressable
+      onPress={disabled ? null : onPress}
+      onPressIn={disabled ? null : pressIn}
+      onPressOut={disabled ? null : pressOut}
+      style={{ opacity: disabled ? 0.4 : 1 }}
+    >
+      <Animated.View style={[style, { transform: [{ scale }], opacity }]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   CHEVRON  (pure RN)
+───────────────────────────────────────────────────────── */
+const Chevron = ({ color = "#C7C7CC" }) => (
+  <View style={ch.wrap}>
+    <View style={[ch.bar, ch.top,    { backgroundColor: color }]} />
+    <View style={[ch.bar, ch.bottom, { backgroundColor: color }]} />
   </View>
 );
-const chevronStyles = StyleSheet.create({
-  wrap: { width: 8, height: 14, justifyContent: "center" },
-  bar: {
-    position: "absolute",
-    width: 8,
-    height: 1.8,
-    backgroundColor: "#C7C7CC",
-    borderRadius: 2,
-  },
-  top: { top: 3, transform: [{ rotate: "40deg" }] },
+const ch = StyleSheet.create({
+  wrap:   { width: 8, height: 14, justifyContent: "center" },
+  bar:    { position: "absolute", width: 8, height: 1.8, borderRadius: 2 },
+  top:    { top: 3,    transform: [{ rotate: "40deg"  }] },
   bottom: { bottom: 3, transform: [{ rotate: "-40deg" }] },
 });
 
-/* ─────────────────────────────────────────────
-   SETTING ROW
-───────────────────────────────────────────── */
-const SettingRow = memo(({ title, subtitle, onPress, isLast }) => {
-  const [pressed, setPressed] = useState(false);
+/* ─────────────────────────────────────────────────────────
+   CHECKMARK  (pure RN)
+───────────────────────────────────────────────────────── */
+const Check = () => (
+  <View style={ck.wrap}>
+    <View style={[ck.bar, ck.short]} />
+    <View style={[ck.bar, ck.long ]} />
+  </View>
+);
+const ck = StyleSheet.create({
+  wrap:  { width: 18, height: 18, justifyContent: "center", alignItems: "center" },
+  bar:   { position: "absolute", height: 2.2, backgroundColor: "#FFF", borderRadius: 2 },
+  short: { width: 5,  bottom: 4, left: 2,  transform: [{ rotate: "45deg"  }] },
+  long:  { width: 9,  bottom: 5, right: 1, transform: [{ rotate: "-50deg" }] },
+});
+
+/* ─────────────────────────────────────────────────────────
+   SETTING ROW  — stagger-animated entry
+───────────────────────────────────────────────────────── */
+const SettingRow = memo(({ title, subtitle, onPress, isLast, delay = 0 }) => {
+  const translateY = useRef(new Animated.Value(12)).current;
+  const opacity    = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity,    { toValue: 1, duration: 280, delay, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, tension: 120, friction: 14, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   return (
-    <>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-        style={[styles.row, pressed && styles.rowPressed]}
-      >
-        <View style={styles.textWrap}>
-          <Text style={styles.rowTitle}>{title}</Text>
-          {subtitle ? <Text style={styles.rowSub}>{subtitle}</Text> : null}
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      <SpringPressable onPress={onPress}>
+        <View style={s.row}>
+          <View style={s.textWrap}>
+            <Text style={s.rowTitle}>{title}</Text>
+            {subtitle ? <Text style={s.rowSub}>{subtitle}</Text> : null}
+          </View>
+          <Chevron />
         </View>
-        <Chevron />
-      </Pressable>
-      {!isLast && <View style={styles.separator} />}
-    </>
+      </SpringPressable>
+      {!isLast && <View style={s.sep} />}
+    </Animated.View>
   );
 });
 
-/* ─────────────────────────────────────────────
-   PLAN BOTTOM SHEET  (pure Modal – no deps)
-───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   GROUP SECTION
+───────────────────────────────────────────────────────── */
+const Group = ({ label, rows }) => (
+  <View style={{ marginBottom: 28 }}>
+    <Text style={s.sectionLabel}>{label}</Text>
+    <View style={s.group}>
+      {rows.map((r, i) => (
+        <SettingRow
+          key={r.title}
+          title={r.title}
+          subtitle={r.subtitle}
+          onPress={r.onPress}
+          isLast={i === rows.length - 1}
+          delay={i * 40}
+        />
+      ))}
+    </View>
+  </View>
+);
+
+/* ─────────────────────────────────────────────────────────
+   PLAN CARD
+───────────────────────────────────────────────────────── */
+const PlanCard = ({ label, price, period, highlight, badge, selected, onPress }) => {
+  const ring  = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(ring,  { toValue: selected ? 1 : 0, tension: 200, friction: 18, useNativeDriver: false }),
+      Animated.spring(scale, { toValue: selected ? 1.02 : 1, tension: 200, friction: 18, useNativeDriver: true }),
+    ]).start();
+  }, [selected]);
+
+  const borderColor = ring.interpolate({ inputRange: [0,1], outputRange: ["transparent", T.accent] });
+  const borderWidth = ring.interpolate({ inputRange: [0,1], outputRange: [0, 2] });
+
+  return (
+    <Pressable onPress={onPress}>
+      <Animated.View
+        style={[
+          s.planCard,
+          highlight && s.planDark,
+          { transform: [{ scale }], borderColor, borderWidth },
+        ]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[s.planLabel, highlight && s.light]}>{label}</Text>
+          <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 4 }}>
+            <Text style={[s.planPrice, highlight && s.light]}>{price}</Text>
+            <Text style={[s.planPeriod, highlight && s.dimLight]}>{"  "}{period}</Text>
+          </View>
+        </View>
+
+        {badge ? (
+          <View style={s.planBadge}>
+            <Text style={s.planBadgeText}>{badge}</Text>
+          </View>
+        ) : null}
+
+        {selected ? (
+          <View style={[s.planCheck, { backgroundColor: T.accent }]}>
+            <Check />
+          </View>
+        ) : (
+          <View style={[s.planCheck, s.planCheckEmpty, highlight && { borderColor: "rgba(255,255,255,0.25)" }]} />
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   PLANS BOTTOM SHEET
+   — spring slide-up
+   — swipe-down PanResponder to dismiss
+   — Android BackHandler
+───────────────────────────────────────────────────────── */
 const PLANS = [
-  { id: "monthly", label: "Monthly", price: "$4.99", period: "/ month", highlight: false },
-  { id: "annual",  label: "Annual",  price: "$39.99", period: "/ year", highlight: true, badge: "Best Value" },
+  { id: "monthly", label: "Monthly", price: "$4.99",  period: "/ month", highlight: false },
+  { id: "annual",  label: "Annual",  price: "$39.99", period: "/ year",  highlight: true,  badge: "Best Value" },
 ];
 
 const PlansSheet = ({ visible, onClose }) => {
-  const slideAnim = useRef(new Animated.Value(300)).current;
+  const insets       = useSafeAreaInsets();
+  const [sel, setSel] = useState("annual");
+  const slideY        = useRef(new Animated.Value(H)).current;
+  const backdropOpac  = useRef(new Animated.Value(0)).current;
 
-  const onShow = () => {
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      tension: 68,
-      friction: 12,
-      useNativeDriver: true,
-    }).start();
+  /* Android back button */
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      animateOut();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible]);
+
+  const animateIn = () => {
+    Animated.parallel([
+      Animated.spring(slideY,       { toValue: 0, tension: 60, friction: 12, useNativeDriver: true }),
+      Animated.timing(backdropOpac, { toValue: 1, duration: 240, useNativeDriver: true }),
+    ]).start();
   };
 
-  const handleClose = () => {
-    Animated.timing(slideAnim, {
-      toValue: 300,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(onClose);
-  };
+  const animateOut = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(slideY,       { toValue: H, duration: 260, useNativeDriver: true }),
+      Animated.timing(backdropOpac, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(onClose);
+  }, [onClose]);
+
+  /* Swipe-down to dismiss */
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) slideY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.5) {
+          animateOut();
+        } else {
+          Animated.spring(slideY, { toValue: 0, tension: 120, friction: 14, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       statusBarTranslucent
-      onShow={onShow}
-      onRequestClose={handleClose}
+      onShow={animateIn}
+      onRequestClose={animateOut}
     >
-      <Pressable style={styles.backdrop} onPress={handleClose} />
+      {/* Backdrop */}
       <Animated.View
-        style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
+        style={[s.backdrop, { opacity: backdropOpac }]}
+        pointerEvents="box-none"
       >
-        {/* Handle bar */}
-        <View style={styles.sheetHandle} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={animateOut} />
+      </Animated.View>
 
-        <Text style={styles.sheetTitle}>Choose a Plan</Text>
-        <Text style={styles.sheetSub}>Cancel anytime. No hidden fees.</Text>
+      {/* Sheet */}
+      <Animated.View
+        style={[
+          s.sheet,
+          { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideY }] },
+        ]}
+      >
+        {/* Drag zone */}
+        <View {...pan.panHandlers} style={s.dragZone}>
+          <View style={s.handle} />
+        </View>
 
-        {PLANS.map((plan) => (
-          <Pressable
-            key={plan.id}
-            style={({ pressed }) => [
-              styles.planCard,
-              plan.highlight && styles.planHighlight,
-              pressed && styles.planPressed,
-            ]}
-          >
-            <View>
-              <Text
-                style={[
-                  styles.planLabel,
-                  plan.highlight && styles.planTextLight,
-                ]}
-              >
-                {plan.label}
-              </Text>
-              <View style={styles.planPriceRow}>
-                <Text
-                  style={[
-                    styles.planPrice,
-                    plan.highlight && styles.planTextLight,
-                  ]}
-                >
-                  {plan.price}
-                </Text>
-                <Text
-                  style={[
-                    styles.planPeriod,
-                    plan.highlight && styles.planPeriodLight,
-                  ]}
-                >
-                  {"  "}{plan.period}
-                </Text>
-              </View>
-            </View>
-            {plan.badge ? (
-              <View style={styles.planBadge}>
-                <Text style={styles.planBadgeText}>{plan.badge}</Text>
-              </View>
-            ) : null}
-          </Pressable>
+        <Text style={s.sheetTitle}>Choose a Plan</Text>
+        <Text style={s.sheetSub}>Cancel anytime · No hidden fees</Text>
+
+        {PLANS.map((p) => (
+          <PlanCard
+            key={p.id}
+            {...p}
+            selected={sel === p.id}
+            onPress={() => setSel(p.id)}
+          />
         ))}
 
-        <Pressable style={styles.sheetCTA}>
+        {/* CTA */}
+        <SpringPressable onPress={animateOut} style={{ marginTop: 14 }}>
           <LinearGradient
-            colors={["#0F172A", "#1E3A5F"]}
+            colors={[T.accent, T.accentDeep]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.sheetCTAGrad}
+            style={s.ctaGrad}
           >
-            <Text style={styles.sheetCTAText}>Get Premium</Text>
+            <Text style={s.ctaText}>Continue with {PLANS.find(p => p.id === sel)?.label}</Text>
           </LinearGradient>
-        </Pressable>
+        </SpringPressable>
 
-        <Pressable style={styles.sheetClose} onPress={handleClose}>
-          <Text style={styles.sheetCloseText}>Maybe Later</Text>
+        <Pressable style={s.sheetClose} onPress={animateOut}>
+          <Text style={s.sheetCloseText}>Maybe Later</Text>
         </Pressable>
       </Animated.View>
     </Modal>
   );
 };
 
-/* ─────────────────────────────────────────────
-   SETTINGS SCREEN
-───────────────────────────────────────────── */
-const SettingsScreen = () => {
-  const [sheetVisible, setSheetVisible] = useState(false);
+/* ─────────────────────────────────────────────────────────
+   SCROLL-AWARE HEADER
+───────────────────────────────────────────────────────── */
+const Header = ({ scrollY, onSettings }) => {
+  const titleSize = scrollY.interpolate({
+    inputRange: [0, 60],
+    outputRange: [32, 22],
+    extrapolate: "clamp",
+  });
+  const titleOpacity = scrollY.interpolate({
+    inputRange: [0, 40],
+    outputRange: [1, 0.85],
+    extrapolate: "clamp",
+  });
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F2F2F7" />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.heading}>Settings</Text>
-            <Text style={styles.version}>Version 4.0.2</Text>
-          </View>
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>⚙</Text>
-          </View>
+    <View style={s.header}>
+      <View>
+        <Animated.Text style={[s.heading, { fontSize: titleSize, opacity: titleOpacity }]}>
+          Settings
+        </Animated.Text>
+        <Text style={s.version}>Version 4.0.2</Text>
+      </View>
+      <SpringPressable onPress={onSettings}>
+        <View style={s.headerBtn}>
+          {/* Hamburger-dots icon — pure RN */}
+          <View style={s.dot} />
+          <View style={s.dot} />
+          <View style={s.dot} />
         </View>
+      </SpringPressable>
+    </View>
+  );
+};
 
-        {/* PREMIUM CARD */}
-        <LinearGradient
-          colors={["#0A0F1E", "#1E3A5F"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.card}
-        >
-          <View style={styles.cardOrb} />
+/* ─────────────────────────────────────────────────────────
+   PREMIUM CARD
+───────────────────────────────────────────────────────── */
+const PremiumCard = ({ onPress }) => {
+  const shimmer = useRef(new Animated.Value(-W)).current;
 
-          <View style={styles.proBadge}>
-            <Text style={styles.proBadgeText}>{"⚡ PRO"}</Text>
-          </View>
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(shimmer, { toValue: W * 2, duration: 2800, useNativeDriver: true, delay: 800 })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
-          <Text style={styles.cardTitle}>Upgrade to Premium</Text>
-          <Text style={styles.cardSub}>
-            Unlock all features and remove limits
-          </Text>
+  return (
+    <LinearGradient
+      colors={["#0A0F1E", "#1B2E50"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={s.card}
+    >
+      {/* Glow orb */}
+      <View style={s.cardOrb} />
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.cardCTA,
-              pressed && { opacity: 0.85 },
-            ]}
-            onPress={() => setSheetVisible(true)}
-          >
-            <Text style={styles.cardCTAText}>{"View Plans  \u2192"}</Text>
-          </Pressable>
-        </LinearGradient>
-
-        {/* ACCOUNT */}
-        <Text style={styles.sectionLabel}>ACCOUNT</Text>
-        <View style={styles.group}>
-          <SettingRow
-            title="Restore Purchases"
-            subtitle="Recover your previous purchases"
-            isLast
-          />
-        </View>
-
-        {/* FEEDBACK */}
-        <Text style={styles.sectionLabel}>FEEDBACK</Text>
-        <View style={styles.group}>
-          <SettingRow title="Rate Us" subtitle="Share your experience" />
-          <SettingRow
-            title="Contact Support"
-            subtitle="We're here to help"
-            isLast
-          />
-        </View>
-
-        {/* LEGAL */}
-        <Text style={styles.sectionLabel}>LEGAL</Text>
-        <View style={styles.group}>
-          <SettingRow title="Privacy Policy" />
-          <SettingRow title="Terms of Use" isLast />
-        </View>
-
-        <Text style={styles.footer}>{"Made with \u2764\uFE0F  \u00B7  v4.0.2"}</Text>
-      </ScrollView>
-
-      <PlansSheet
-        visible={sheetVisible}
-        onClose={() => setSheetVisible(false)}
+      {/* Shimmer sweep */}
+      <Animated.View
+        style={[s.shimmer, { transform: [{ translateX: shimmer }] }]}
+        pointerEvents="none"
       />
+
+      <View style={s.proBadge}>
+        <Text style={s.proBadgeText}>⚡  PRO</Text>
+      </View>
+
+      <Text style={s.cardTitle}>Upgrade to Premium</Text>
+      <Text style={s.cardSub}>Unlock everything. Cancel anytime.</Text>
+
+      <SpringPressable onPress={onPress}>
+        <LinearGradient
+          colors={[T.accent, T.accentDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={s.cardCTA}
+        >
+          <Text style={s.cardCTAText}>View Plans</Text>
+          {/* Arrow */}
+          <View style={s.arrow}>
+            <View style={s.arrowLine} />
+            <View style={[s.arrowTip, s.arrowTipTop]} />
+            <View style={[s.arrowTip, s.arrowTipBot]} />
+          </View>
+        </LinearGradient>
+      </SpringPressable>
+    </LinearGradient>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   SETTINGS SCREEN
+───────────────────────────────────────────────────────── */
+const SettingsScreen = () => {
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const ROWS = {
+    ACCOUNT: [
+      { title: "Restore Purchases", subtitle: "Recover your previous purchases" },
+    ],
+    FEEDBACK: [
+      { title: "Rate Us",          subtitle: "Share your experience"  },
+      { title: "Contact Support",  subtitle: "We're here to help"     },
+    ],
+    LEGAL: [
+      { title: "Privacy Policy" },
+      { title: "Terms of Use"   },
+    ],
+  };
+
+  return (
+    <SafeAreaView style={s.container} edges={["top"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
+
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.content}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
+        <Header scrollY={scrollY} onSettings={() => {}} />
+        <PremiumCard onPress={() => setSheetVisible(true)} />
+
+        {Object.entries(ROWS).map(([label, rows]) => (
+          <Group key={label} label={label} rows={rows} />
+        ))}
+
+        <Text style={s.footer}>{"Made with \u2764\uFE0F  \u00B7  v4.0.2"}</Text>
+      </Animated.ScrollView>
+
+      <PlansSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} />
     </SafeAreaView>
   );
 };
 
-/* ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    ROOT
-───────────────────────────────────────────── */
+───────────────────────────────────────────────────────── */
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -278,291 +500,152 @@ export default function App() {
   );
 }
 
-/* ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    STYLES
-───────────────────────────────────────────── */
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F7",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 48,
-  },
+───────────────────────────────────────────────────────── */
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: T.bg },
+  content:   { paddingHorizontal: 20, paddingBottom: 56 },
 
   /* HEADER */
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 10,
-    marginBottom: 22,
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "flex-start", paddingTop: 10, marginBottom: 24,
   },
-  heading: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#000",
-    letterSpacing: -0.6,
+  heading: { fontWeight: "700", color: T.label, letterSpacing: -0.6 },
+  version: { fontSize: 12, color: T.sub, marginTop: 3 },
+  headerBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: T.surface,
+    justifyContent: "center", alignItems: "center",
+    ...Platform.select({
+      ios:     { shadowColor: "#000", shadowOffset: {width:0,height:1}, shadowOpacity:0.07, shadowRadius:4 },
+      android: { elevation: 2 },
+    }),
   },
-  version: {
-    fontSize: 12,
-    color: "#8E8E93",
-    marginTop: 2,
-  },
-  headerBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E5E5EA",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerBadgeText: {
-    fontSize: 18,
+  dot: {
+    width: 4, height: 4, borderRadius: 2,
+    backgroundColor: T.sub, marginVertical: 1.5,
   },
 
   /* PREMIUM CARD */
-  card: {
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 32,
-    overflow: "hidden",
-  },
+  card: { borderRadius: T.radiusLg, padding: 24, marginBottom: 32, overflow: "hidden" },
   cardOrb: {
-    position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(99,102,241,0.15)",
-    right: -40,
-    top: -40,
+    position: "absolute", width: 200, height: 200, borderRadius: 100,
+    backgroundColor: "rgba(99,102,241,0.14)", right: -60, top: -60,
+  },
+  shimmer: {
+    position: "absolute", top: 0, bottom: 0, width: 80,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    transform: [{ skewX: "-20deg" }],
   },
   proBadge: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(245,158,11,0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(245,158,11,0.4)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderWidth: 1, borderColor: "rgba(245,158,11,0.4)",
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
     marginBottom: 14,
   },
-  proBadgeText: {
-    color: "#F59E0B",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-  },
-  cardTitle: {
-    color: "#FFF",
-    fontSize: 21,
-    fontWeight: "700",
-    marginBottom: 5,
-    letterSpacing: -0.3,
-  },
-  cardSub: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 13,
-    marginBottom: 20,
-    lineHeight: 19,
-  },
+  proBadgeText: { color: T.amber, fontSize: 11, fontWeight: "700", letterSpacing: 0.8 },
+  cardTitle: { color: "#FFF", fontSize: 21, fontWeight: "700", marginBottom: 5, letterSpacing: -0.3 },
+  cardSub:   { color: "rgba(255,255,255,0.48)", fontSize: 13, marginBottom: 20, lineHeight: 19 },
   cardCTA: {
-    alignSelf: "flex-start",
-    backgroundColor: "#FFF",
-    paddingVertical: 11,
-    paddingHorizontal: 22,
-    borderRadius: 50,
+    alignSelf: "flex-start", flexDirection: "row", alignItems: "center",
+    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 50,
   },
-  cardCTAText: {
-    color: "#0A0F1E",
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.2,
+  cardCTAText: { color: "#FFF", fontSize: 14, fontWeight: "700", letterSpacing: 0.1, marginRight: 8 },
+
+  /* Arrow icon — pure RN */
+  arrow: { width: 14, height: 14, justifyContent: "center", alignItems: "center" },
+  arrowLine: {
+    position: "absolute", width: 10, height: 1.8,
+    backgroundColor: "#FFF", borderRadius: 1, right: 0,
   },
+  arrowTip: {
+    position: "absolute", width: 6, height: 1.8,
+    backgroundColor: "#FFF", borderRadius: 1, right: 0,
+  },
+  arrowTipTop: { top: 3,    transform: [{ rotate: "-40deg" }], transformOrigin: "right" },
+  arrowTipBot: { bottom: 3, transform: [{ rotate: "40deg"  }], transformOrigin: "right" },
 
   /* SECTION LABEL */
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#8E8E93",
-    letterSpacing: 0.9,
-    marginBottom: 8,
-    marginLeft: 6,
+    fontSize: 11, fontWeight: "600", color: T.sub,
+    letterSpacing: 0.9, marginBottom: 8, marginLeft: 6,
   },
 
   /* GROUP */
   group: {
-    backgroundColor: "#FFF",
-    borderRadius: 14,
-    marginBottom: 28,
-    overflow: "hidden",
+    backgroundColor: T.surface, borderRadius: T.radius, overflow: "hidden",
     ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
+      ios:     { shadowColor:"#000", shadowOffset:{width:0,height:1}, shadowOpacity:0.05, shadowRadius:4 },
       android: { elevation: 1 },
     }),
   },
 
   /* ROW */
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-  },
-  rowPressed: {
-    backgroundColor: "#F2F2F7",
-  },
+  row:      { flexDirection: "row", alignItems: "center", paddingVertical: 15, paddingHorizontal: 18 },
   textWrap: { flex: 1 },
-  rowTitle: {
-    fontSize: 16,
-    color: "#000",
-    fontWeight: "400",
-  },
-  rowSub: {
-    fontSize: 12,
-    color: "#8E8E93",
-    marginTop: 2,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "#E5E5EA",
-    marginLeft: 18,
-  },
+  rowTitle: { fontSize: 16, color: T.label, fontWeight: "400" },
+  rowSub:   { fontSize: 12, color: T.sub,   marginTop: 2 },
+  sep:      { height: StyleSheet.hairlineWidth, backgroundColor: T.sep, marginLeft: 18 },
 
   /* FOOTER */
-  footer: {
-    textAlign: "center",
-    fontSize: 12,
-    color: "#C7C7CC",
-    marginTop: 4,
-  },
+  footer: { textAlign: "center", fontSize: 12, color: "#C7C7CC", marginTop: 8 },
 
   /* BACKDROP */
   backdrop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.42)",
   },
 
   /* SHEET */
   sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#FFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === "ios" ? 40 : 28,
-    paddingTop: 12,
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: T.surface,
+    borderTopLeftRadius: T.radiusXl, borderTopRightRadius: T.radiusXl,
+    paddingHorizontal: 22, paddingTop: 0,
     ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: { elevation: 20 },
+      ios:     { shadowColor:"#000", shadowOffset:{width:0,height:-4}, shadowOpacity:0.1, shadowRadius:16 },
+      android: { elevation: 24 },
     }),
   },
-  sheetHandle: {
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#E5E5EA",
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#000",
-    letterSpacing: -0.4,
-    marginBottom: 4,
-  },
-  sheetSub: {
-    fontSize: 14,
-    color: "#8E8E93",
-    marginBottom: 20,
-  },
+  dragZone:   { paddingVertical: 14, alignItems: "center" },
+  handle:     { width: 36, height: 4, borderRadius: 2, backgroundColor: "#E0E0E0" },
+  sheetTitle: { fontSize: 22, fontWeight: "700", color: T.label, letterSpacing: -0.4, marginBottom: 4 },
+  sheetSub:   { fontSize: 14, color: T.sub, marginBottom: 18 },
 
   /* PLAN CARDS */
   planCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F2F2F7",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "#F2F2F7", borderRadius: T.radius,
+    padding: 16, marginBottom: 10, borderWidth: 0,
   },
-  planHighlight: {
-    backgroundColor: "#0A0F1E",
-  },
-  planPressed: { opacity: 0.85 },
-  planLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#000",
-  },
-  planTextLight: { color: "#FFF" },
-  planPriceRow: { flexDirection: "row", alignItems: "baseline", marginTop: 3 },
-  planPrice: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#000",
-  },
-  planPeriod: {
-    fontSize: 13,
-    color: "#8E8E93",
-  },
-  planPeriodLight: { color: "rgba(255,255,255,0.55)" },
+  planDark:    { backgroundColor: T.dark },
+  planLabel:   { fontSize: 15, fontWeight: "600", color: T.label },
+  light:       { color: "#FFF" },
+  dimLight:    { color: "rgba(255,255,255,0.48)" },
+  planPrice:   { fontSize: 20, fontWeight: "700", color: T.label },
+  planPeriod:  { fontSize: 13, color: T.sub },
   planBadge: {
-    backgroundColor: "#F59E0B",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    backgroundColor: T.amber,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 20, marginRight: 10,
   },
-  planBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#FFF",
+  planBadgeText: { fontSize: 11, fontWeight: "700", color: "#FFF" },
+  planCheck: {
+    width: 22, height: 22, borderRadius: 11,
+    justifyContent: "center", alignItems: "center",
+  },
+  planCheckEmpty: {
+    borderWidth: 1.5, borderColor: "#C7C7CC",
+    backgroundColor: "transparent",
   },
 
-  /* SHEET CTA */
-  sheetCTA: {
-    borderRadius: 14,
-    overflow: "hidden",
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  sheetCTAGrad: {
-    paddingVertical: 16,
-    alignItems: "center",
-    borderRadius: 14,
-  },
-  sheetCTAText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  sheetClose: {
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-  sheetCloseText: {
-    fontSize: 15,
-    color: "#8E8E93",
-  },
+  /* CTA */
+  ctaGrad: { paddingVertical: 16, borderRadius: T.radius, alignItems: "center" },
+  ctaText: { color: "#FFF", fontSize: 16, fontWeight: "700", letterSpacing: 0.1 },
+
+  sheetClose:     { alignItems: "center", paddingVertical: 16 },
+  sheetCloseText: { fontSize: 15, color: T.sub },
 });

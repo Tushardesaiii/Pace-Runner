@@ -1,6 +1,5 @@
-import React, { useRef, useState, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Animated,
   Dimensions,
   Pressable,
   StyleSheet,
@@ -15,206 +14,331 @@ import {
   ImageBackground,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Activity, Zap, Heart, Target, ChevronLeft, User, Shield } from 'lucide-react-native';
+import { ArrowRight, Activity, Zap, Heart, Target, ChevronLeft, Shield, Check } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  interpolate,
+  Extrapolation,
+  FadeInDown,
+  FadeInRight,
+  FadeInUp,
+} from 'react-native-reanimated';
+import { useAuth } from '@/utils/auth/useAuth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// --- Optimized Sub-Components (Memoized for zero-lag) ---
-const StepIndicator = memo(({ activeStep }) => (
-  <View style={styles.stepIndicator}>
-    {[1, 2, 3].map(i => (
-      <View key={i} style={[styles.dot, activeStep === i && styles.dotActive]} />
-    ))}
-  </View>
-));
+// --- Reusable Premium Components ---
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const PremiumButton = ({ onPress, text, icon: Icon, isPrimary = true, style }) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <AnimatedPressable
+      onPressIn={() => {
+        scale.value = withSpring(0.97, { damping: 20, stiffness: 200 });
+        Haptics.selectionAsync();
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 20, stiffness: 200 });
+      }}
+      onPress={onPress}
+      style={[
+        styles.buttonBase,
+        isPrimary ? styles.buttonPrimary : styles.buttonSecondary,
+        animatedStyle,
+        style
+      ]}
+    >
+      <Text style={[styles.buttonText, !isPrimary && { color: '#222222' }]}>{text}</Text>
+      {Icon && <Icon color={isPrimary ? "#FFFFFF" : "#222222"} size={18} />}
+    </AnimatedPressable>
+  );
+};
+
+const CustomInput = ({ label, placeholder, value, onChangeText, keyboardType = 'default', unit }) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const focusAnim = useSharedValue(0);
+
+  useEffect(() => {
+    focusAnim.value = withTiming(isFocused ? 1 : 0, { duration: 150 });
+  }, [isFocused]);
+
+  const animatedBorder = useAnimatedStyle(() => ({
+    borderColor: interpolate(focusAnim.value, [0, 1], [0, 1]) === 1 ? '#222222' : '#DDDDDD',
+    borderWidth: interpolate(focusAnim.value, [0, 1], [1, 2]),
+  }));
+
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <Animated.View style={[styles.inputWrapper, animatedBorder]}>
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor="#B0B0B0"
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType={keyboardType}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+        {unit && <Text style={styles.inputUnit}>{unit}</Text>}
+      </Animated.View>
+    </View>
+  );
+};
 
 export default function UltimateOnboarding() {
   const router = useRouter();
-  const [step, setStep] = useState(0); // 0 is Splash
-  const scrollX = useRef(new Animated.Value(0)).current;
-  
-  // Data State Hub
+  const { setOnboardingCompleted } = useAuth();
+  const [step, setStep] = useState(0);
+  const scrollX = useSharedValue(0);
+
+  const SPRING_CONFIG = { damping: 25, stiffness: 180 };
+
   const [data, setData] = useState({
     name: '', age: '', weight: '', height: '',
-    level: 'Inter', hrMax: '185',
+    level: 'Inter', hrMax: '185', restingHr: '',
     goal: 'Endurance', frequency: '4x'
   });
 
   const next = () => {
     Keyboard.dismiss();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     if (step === 0) {
       setStep(1);
+      scrollX.value = withSpring(SCREEN_WIDTH * 1, SPRING_CONFIG);
       return;
     }
     if (step === 3) {
+      if (setOnboardingCompleted) {
+        setOnboardingCompleted(true);
+      }
       router.replace('/(tabs)');
       return;
     }
 
-    Animated.spring(scrollX, {
-      toValue: -(SCREEN_WIDTH * step),
-      useNativeDriver: true,
-      tension: 50,
-      friction: 10
-    }).start(() => setStep(step + 1));
+    setStep(step + 1);
+    scrollX.value = withSpring(SCREEN_WIDTH * (step + 1), SPRING_CONFIG);
   };
 
   const back = () => {
+    Keyboard.dismiss();
+    Haptics.selectionAsync();
     if (step <= 1) {
       setStep(0);
-      scrollX.setValue(0);
+      scrollX.value = withSpring(0, SPRING_CONFIG);
       return;
     }
-    Animated.spring(scrollX, {
-      toValue: -(SCREEN_WIDTH * (step - 2)),
-      useNativeDriver: true,
-      tension: 50,
-      friction: 10
-    }).start(() => setStep(step - 1));
+    setStep(step - 1);
+    scrollX.value = withSpring(SCREEN_WIDTH * (step - 1), SPRING_CONFIG);
   };
 
-  // --- RENDERS ---
+  const animatedSliderStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -scrollX.value }],
+  }));
 
-  if (step === 0) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <ImageBackground 
-          source={{ uri: 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070' }} 
-          style={StyleSheet.absoluteFillObject}
-        >
-          <LinearGradient colors={['rgba(15, 23, 42, 0.4)', '#0F172A']} style={StyleSheet.absoluteFillObject} />
-        </ImageBackground>
-        <SafeAreaView style={styles.splashContent}>
-          <View>
-            <Text style={styles.logo}>PACE<Text style={{color: '#FF6A2C'}}>RUNNER</Text></Text>
-            <Text style={styles.splashTitle}>Engineered for{'\n'}the Elite.</Text>
-            <Text style={styles.splashSub}>Personalized biomechanics and AI-driven training cycles.</Text>
-          </View>
-          <Pressable style={styles.entryButton} onPress={next}>
-            <Text style={styles.entryButtonText}>BEGIN INITIALIZATION</Text>
-            <ArrowRight color="#FFF" size={20} />
-          </Pressable>
-        </SafeAreaView>
-      </View>
-    );
-  }
+  const renderIndicators = () => (
+    <View style={styles.indicatorContainer}>
+      {[1, 2, 3].map((i) => {
+        const animatedDotStyle = useAnimatedStyle(() => {
+          const isActive = scrollX.value >= (i - 1.5) * SCREEN_WIDTH && scrollX.value < (i - 0.5) * SCREEN_WIDTH;
+          return {
+            width: withTiming(isActive ? 24 : 6, { duration: 200 }),
+            backgroundColor: withTiming(isActive ? '#222222' : '#DDDDDD', { duration: 200 }),
+          };
+        });
+        return <Animated.View key={i} style={[styles.dot, animatedDotStyle]} />;
+      })}
+    </View>
+  );
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={styles.navBar}>
-            <Pressable onPress={back} hitSlop={20}><ChevronLeft color="#0F172A" size={28} /></Pressable>
-            <StepIndicator activeStep={step} />
-            <Shield color="#94A3B8" size={20} />
-          </View>
+        
+        {/* SPLASH SCREEN */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, useAnimatedStyle(() => ({
+          opacity: interpolate(scrollX.value, [0, SCREEN_WIDTH * 0.5], [1, 0], Extrapolation.CLAMP),
+          pointerEvents: step === 0 ? 'auto' : 'none',
+          backgroundColor: '#FFFFFF',
+          zIndex: 10
+        }))]}>
+          <ImageBackground 
+            source={{ uri: 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070' }} 
+            style={StyleSheet.absoluteFillObject}
+            imageStyle={{ opacity: 0.05 }}
+          />
+          <SafeAreaView style={styles.splashContent}>
+            <Animated.View entering={FadeInDown.delay(100).springify().stiffness(200)}>
+              <Text style={styles.logo}>PACE<Text style={{color: '#FF385C'}}>RUNNER</Text></Text>
+            </Animated.View>
+            <View>
+              <Animated.Text entering={FadeInDown.delay(200).springify().stiffness(200)} style={styles.splashTitle}>
+                Your running,{'\n'}perfected.
+              </Animated.Text>
+              <Animated.Text entering={FadeInDown.delay(300).springify().stiffness(200)} style={styles.splashSub}>
+                Personalized plans. Biomechanical tracking. Designed for everyday athletes.
+              </Animated.Text>
+              <Animated.View entering={FadeInUp.delay(400).springify().stiffness(200)}>
+                <PremiumButton 
+                  text="Get Started" 
+                  icon={ArrowRight} 
+                  onPress={next} 
+                  style={{ marginTop: 40 }}
+                />
+              </Animated.View>
+            </View>
+          </SafeAreaView>
+        </Animated.View>
+
+        {/* MAIN ONBOARDING FLOW */}
+        <SafeAreaView style={[StyleSheet.absoluteFillObject, { pointerEvents: step === 0 ? 'none' : 'auto' }]}>
+          <Animated.View style={[styles.navBar, useAnimatedStyle(() => ({
+            opacity: interpolate(scrollX.value, [0, SCREEN_WIDTH * 0.5], [0, 1], Extrapolation.CLAMP),
+          }))]}>
+            <Pressable onPress={back} hitSlop={20} style={styles.backButton}>
+              <ChevronLeft color="#222222" size={20} />
+            </Pressable>
+            {renderIndicators()}
+            <View style={{width: 40}} /> {/* Spacer for centering */}
+          </Animated.View>
 
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
             style={{ flex: 1 }}
-            keyboardVerticalOffset={20}
           >
-            <Animated.View style={[styles.slider, { transform: [{ translateX: scrollX }] }]}>
+            <Animated.View style={[styles.slider, animatedSliderStyle]}>
               
               {/* PAGE 1: BIOMETRICS */}
-              <View style={styles.page}>
-                <Text style={styles.hubLabel}>01 . BIOMETRICS</Text>
-                <Text style={styles.hubTitle}>Identity &{'\n'}Physics</Text>
+              <View style={[styles.page, { marginLeft: SCREEN_WIDTH }]}>
+                <Animated.Text entering={FadeInRight.delay(100)} style={styles.hubTitle}>About you</Animated.Text>
+                <Animated.Text entering={FadeInRight.delay(150)} style={styles.hubSub}>Let's tailor the experience to your body.</Animated.Text>
                 
-                <View style={styles.formContainer}>
-                  <Text style={styles.fieldLabel}>FULL NAME</Text>
-                  <TextInput 
-                    placeholder="Chitti" 
-                    style={styles.bigInput} 
+                <Animated.View entering={FadeInRight.delay(200)} style={styles.formContainer}>
+                  <CustomInput 
+                    label="First Name" 
+                    placeholder="e.g. John" 
+                    value={data.name}
                     onChangeText={(v) => setData({...data, name: v})}
                   />
                   
-                  <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.fieldLabel}>AGE</Text>
-                      <TextInput placeholder="24" keyboardType="numeric" style={styles.statInput} />
+                  <View style={styles.rowGrid}>
+                    <View style={{flex: 1}}>
+                      <CustomInput label="Age" placeholder="28" keyboardType="numeric" value={data.age} onChangeText={(v) => setData({...data, age: v})} />
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.fieldLabel}>WEIGHT</Text>
-                      <TextInput placeholder="72kg" keyboardType="numeric" style={styles.statInput} />
+                    <View style={{flex: 1}}>
+                      <CustomInput label="Weight" placeholder="75" keyboardType="numeric" unit="kg" value={data.weight} onChangeText={(v) => setData({...data, weight: v})} />
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.fieldLabel}>HEIGHT</Text>
-                      <TextInput placeholder="180cm" keyboardType="numeric" style={styles.statInput} />
+                    <View style={{flex: 1}}>
+                      <CustomInput label="Height" placeholder="180" keyboardType="numeric" unit="cm" value={data.height} onChangeText={(v) => setData({...data, height: v})} />
                     </View>
                   </View>
-                </View>
+                </Animated.View>
               </View>
 
-              {/* PAGE 2: PERFORMANCE */}
+              {/* PAGE 2: CAPABILITY */}
               <View style={styles.page}>
-                <Text style={styles.hubLabel}>02 . CAPABILITY</Text>
-                <Text style={styles.hubTitle}>Performance{'\n'}Calibration</Text>
+                <Text style={styles.hubTitle}>Your baseline</Text>
+                <Text style={styles.hubSub}>Where are you starting from?</Text>
                 
-                <View style={styles.levelGroup}>
-                  {['Novice', 'Inter', 'Pro'].map(lvl => (
-                    <Pressable 
-                      key={lvl}
-                      onPress={() => { Haptics.selectionAsync(); setData({...data, level: lvl})}}
-                      style={[styles.levelChip, data.level === lvl && styles.levelChipActive]}
-                    >
-                      <Text style={[styles.levelChipText, data.level === lvl && styles.levelChipTextActive]}>{lvl.toUpperCase()}</Text>
-                      {data.level === lvl && <Zap size={14} color="#FFF" fill="#FFF" />}
-                    </Pressable>
-                  ))}
-                </View>
-
-                <View style={styles.hrCard}>
-                  <View style={styles.hrHeader}>
-                    <Heart size={18} color="#FF6A2C" />
-                    <Text style={styles.hrTitle}>RESTING HEART RATE</Text>
+                <View style={styles.formContainer}>
+                  <Text style={styles.inputLabel}>Experience Level</Text>
+                  <View style={styles.levelGroup}>
+                    {['Novice', 'Intermediate', 'Advanced'].map((lvl, idx) => {
+                      const shortLvl = ['Novice', 'Inter', 'Pro'][idx];
+                      const isActive = data.level === shortLvl;
+                      return (
+                        <Pressable 
+                          key={shortLvl}
+                          onPress={() => { Haptics.selectionAsync(); setData({...data, level: shortLvl})}}
+                          style={[styles.levelChip, isActive && styles.levelChipActive]}
+                        >
+                          <Text style={[styles.levelChipText, isActive && styles.levelChipTextActive]}>{lvl}</Text>
+                        </Pressable>
+                      );
+                    })}
                   </View>
-                  <TextInput placeholder="60" keyboardType="numeric" style={styles.hrInput} />
-                  <Text style={styles.hrSub}>Used to calculate Zone 2 thresholds.</Text>
+
+                  <View style={{marginTop: 20}}>
+                    <CustomInput 
+                      label="Resting Heart Rate (Optional)" 
+                      placeholder="60" 
+                      keyboardType="numeric" 
+                      unit="bpm" 
+                      value={data.restingHr}
+                      onChangeText={(v) => setData({...data, restingHr: v})}
+                    />
+                    <View style={styles.infoRow}>
+                      <Heart size={14} color="#717171" />
+                      <Text style={styles.infoText}>Helps us calculate accurate heart rate zones.</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
 
-              {/* PAGE 3: STRATEGY */}
+              {/* PAGE 3: OBJECTIVE */}
               <View style={styles.page}>
-                <Text style={styles.hubLabel}>03 . OBJECTIVE</Text>
-                <Text style={styles.hubTitle}>Mission{'\n'}Parameters</Text>
+                <Text style={styles.hubTitle}>Your goal</Text>
+                <Text style={styles.hubSub}>What are we training for?</Text>
                 
                 <View style={styles.goalStack}>
                   {[
-                    { id: 'Endurance', title: 'Endurance Build', icon: Activity },
-                    { id: 'Speed', title: 'Speed & Power', icon: Zap },
-                    { id: 'Weight', title: 'Metabolic Optimization', icon: Target },
-                  ].map(g => (
-                    <Pressable 
-                      key={g.id}
-                      onPress={() => setData({...data, goal: g.id})}
-                      style={[styles.goalRow, data.goal === g.id && styles.goalRowActive]}
-                    >
-                      <View style={[styles.iconWrap, data.goal === g.id && { backgroundColor: '#FF6A2C' }]}>
-                        <g.icon size={20} color={data.goal === g.id ? "#FFF" : "#FF6A2C"} />
-                      </View>
-                      <Text style={[styles.goalText, data.goal === g.id && styles.goalTextActive]}>{g.title}</Text>
-                    </Pressable>
-                  ))}
+                    { id: 'Endurance', title: 'Distance & Endurance', desc: 'Build stamina for longer runs.', icon: Activity },
+                    { id: 'Speed', title: 'Speed & Power', desc: 'Improve 5k/10k times and sprinting.', icon: Zap },
+                    { id: 'Weight', title: 'Fitness & Health', desc: 'General conditioning and fat loss.', icon: Target },
+                  ].map(g => {
+                    const isActive = data.goal === g.id;
+                    return (
+                      <Pressable 
+                        key={g.id}
+                        onPress={() => { Haptics.selectionAsync(); setData({...data, goal: g.id})}}
+                        style={[styles.goalRow, isActive && styles.goalRowActive]}
+                      >
+                        <View style={styles.iconWrap}>
+                          <g.icon size={22} color={isActive ? "#FF385C" : "#717171"} />
+                        </View>
+                        <View style={{flex: 1}}>
+                          <Text style={styles.goalText}>{g.title}</Text>
+                          <Text style={styles.goalDesc}>{g.desc}</Text>
+                        </View>
+                        <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
+                          {isActive && <View style={styles.radioInner} />}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
             </Animated.View>
           </KeyboardAvoidingView>
 
-          <View style={styles.footer}>
-            <Pressable style={styles.mainButton} onPress={next}>
-              <Text style={styles.mainButtonText}>{step === 3 ? "LAUNCH ENGINE" : "CONTINUE"}</Text>
-              <ArrowRight color="#FFF" size={20} />
-            </Pressable>
-          </View>
+          <Animated.View style={[styles.footer, useAnimatedStyle(() => ({
+            opacity: interpolate(scrollX.value, [0, SCREEN_WIDTH * 0.5], [0, 1], Extrapolation.CLAMP),
+            transform: [{
+              translateY: interpolate(scrollX.value, [0, SCREEN_WIDTH * 0.5], [20, 0], Extrapolation.CLAMP)
+            }]
+          }))]}>
+            <PremiumButton 
+              text={step === 3 ? "Complete Profile" : "Continue"} 
+              icon={step === 3 ? Check : undefined} 
+              onPress={next} 
+              isPrimary={true}
+            />
+          </Animated.View>
         </SafeAreaView>
       </View>
     </TouchableWithoutFeedback>
@@ -222,55 +346,59 @@ export default function UltimateOnboarding() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   // Splash Styles
-  splashContent: { flex: 1, padding: 40, justifyContent: 'space-between' },
-  logo: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 4 },
-  splashTitle: { color: '#FFF', fontSize: 52, fontWeight: '800', marginTop: 20, lineHeight: 56 },
-  splashSub: { color: '#94A3B8', fontSize: 18, marginTop: 15, lineHeight: 26 },
-  entryButton: { height: 74, backgroundColor: '#0F172A', borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  entryButtonText: { color: '#FFF', fontSize: 14, fontWeight: '800', letterSpacing: 2 },
+  splashContent: { flex: 1, padding: 32, justifyContent: 'space-between' },
+  logo: { color: '#222222', fontSize: 16, fontWeight: '800', letterSpacing: 2, marginTop: 20 },
+  splashTitle: { color: '#222222', fontSize: 44, fontWeight: '700', marginTop: 20, lineHeight: 48, letterSpacing: -1 },
+  splashSub: { color: '#717171', fontSize: 18, marginTop: 16, lineHeight: 26, fontWeight: '400' },
+  
+  // Premium Button (Airbnb style: smaller, fully rounded or subtle rounded)
+  buttonBase: { height: 52, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  buttonPrimary: { backgroundColor: '#222222' },
+  buttonSecondary: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDDDDD' },
+  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 
-  // Onboarding Hub Styles
-  navBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, height: 60 },
-  stepIndicator: { flexDirection: 'row', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E2E8F0' },
-  dotActive: { width: 22, backgroundColor: '#0F172A' },
+  // Nav
+  navBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, height: 56, marginTop: 10 },
+  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F7F7F7', justifyContent: 'center', alignItems: 'center' },
+  indicatorContainer: { flexDirection: 'row', gap: 6 },
+  dot: { height: 6, borderRadius: 3 },
 
-  slider: { flexDirection: 'row', width: SCREEN_WIDTH * 3, flex: 1 },
-  page: { width: SCREEN_WIDTH, padding: 30 },
-  hubLabel: { fontSize: 11, fontWeight: '900', color: '#FF6A2C', letterSpacing: 2 },
-  hubTitle: { fontSize: 42, fontWeight: '800', color: '#0F172A', marginTop: 10, lineHeight: 48 },
+  slider: { flexDirection: 'row', width: SCREEN_WIDTH * 4, flex: 1 },
+  page: { width: SCREEN_WIDTH, padding: 32, paddingTop: 10 },
+  hubTitle: { fontSize: 32, fontWeight: '700', color: '#222222', lineHeight: 38, letterSpacing: -0.5 },
+  hubSub: { fontSize: 16, color: '#717171', marginTop: 8, fontWeight: '400' },
 
-  // Inputs & Grid
-  formContainer: { marginTop: 40 },
-  fieldLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', marginBottom: 8, letterSpacing: 1 },
-  bigInput: { fontSize: 28, fontWeight: '700', color: '#0F172A', borderBottomWidth: 1.5, borderBottomColor: '#F1F5F9', paddingBottom: 15, marginBottom: 35 },
-  statsGrid: { flexDirection: 'row', gap: 20 },
-  statItem: { flex: 1 },
-  statInput: { fontSize: 20, fontWeight: '700', color: '#0F172A', borderBottomWidth: 1.5, borderBottomColor: '#F1F5F9', paddingBottom: 10 },
+  // Custom Inputs
+  formContainer: { marginTop: 32, gap: 24 },
+  inputContainer: { gap: 8 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#222222' },
+  inputWrapper: { height: 56, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  input: { flex: 1, color: '#222222', fontSize: 16, fontWeight: '500', height: '100%' },
+  inputUnit: { color: '#717171', fontSize: 14, fontWeight: '500', marginLeft: 8 },
+  rowGrid: { flexDirection: 'row', gap: 12 },
 
-  // Performance (Page 2)
-  levelGroup: { flexDirection: 'row', gap: 10, marginTop: 30, marginBottom: 40 },
-  levelChip: { flex: 1, height: 54, borderRadius: 18, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
-  levelChipActive: { backgroundColor: '#0F172A' },
-  levelChipText: { fontSize: 12, fontWeight: '800', color: '#64748B' },
-  levelChipTextActive: { color: '#FFF' },
-  hrCard: { padding: 25, backgroundColor: '#FFF7F5', borderRadius: 30 },
-  hrHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 15 },
-  hrTitle: { fontSize: 11, fontWeight: '900', color: '#FF6A2C' },
-  hrInput: { fontSize: 40, fontWeight: '800', color: '#0F172A' },
-  hrSub: { fontSize: 12, color: '#94A3B8', marginTop: 10 },
+  // Level Selection
+  levelGroup: { flexDirection: 'column', gap: 12, marginTop: 8 },
+  levelChip: { width: '100%', height: 56, borderRadius: 12, backgroundColor: '#FFFFFF', justifyContent: 'center', paddingHorizontal: 20, borderWidth: 1, borderColor: '#DDDDDD' },
+  levelChipActive: { borderColor: '#222222', backgroundColor: '#F7F7F7', borderWidth: 2 },
+  levelChipText: { fontSize: 16, fontWeight: '500', color: '#717171' },
+  levelChipTextActive: { color: '#222222', fontWeight: '600' },
 
-  // Strategic (Page 3)
-  goalStack: { gap: 15, marginTop: 30 },
-  goalRow: { height: 84, backgroundColor: '#F8FAFC', borderRadius: 24, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 15, borderWidth: 1, borderColor: 'transparent' },
-  goalRowActive: { backgroundColor: '#FFF', borderColor: '#FF6A2C', shadowColor: '#FF6A2C', shadowOpacity: 0.05, shadowRadius: 10 },
-  iconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center' },
-  goalText: { fontSize: 17, fontWeight: '700', color: '#475569' },
-  goalTextActive: { color: '#0F172A' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  infoText: { fontSize: 13, color: '#717171', fontWeight: '400' },
 
-  footer: { padding: 30, paddingBottom: 40 },
-  mainButton: { height: 74, backgroundColor: '#0F172A', borderRadius: 26, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
-  mainButtonText: { color: '#FFF', fontSize: 16, fontWeight: '800', letterSpacing: 1 }
+  // Goals
+  goalStack: { gap: 16, marginTop: 32 },
+  goalRow: { padding: 20, backgroundColor: '#FFFFFF', borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderWidth: 1, borderColor: '#DDDDDD' },
+  goalRowActive: { borderColor: '#222222', backgroundColor: '#F7F7F7', borderWidth: 2 },
+  iconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F7F7F7', justifyContent: 'center', alignItems: 'center' },
+  goalText: { fontSize: 16, fontWeight: '600', color: '#222222', marginBottom: 4 },
+  goalDesc: { fontSize: 14, color: '#717171', fontWeight: '400' },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: '#DDDDDD', justifyContent: 'center', alignItems: 'center' },
+  radioOuterActive: { borderColor: '#222222', borderWidth: 2 },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#222222' },
+
+  footer: { padding: 32, paddingBottom: Platform.OS === 'ios' ? 40 : 32 },
 });

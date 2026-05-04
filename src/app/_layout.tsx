@@ -193,8 +193,8 @@ export default function RootLayout() {
             <Stack.Screen
               name="signin"
               options={{
-                animation:      "fade",
-                animationDuration: 220,
+                animation: "fade",
+                animationDuration: 150,
               }}
             />
 
@@ -204,7 +204,7 @@ export default function RootLayout() {
             */}
             <Stack.Screen
               name="(tabs)"
-              options={{ animation: "none" }}
+              options={{ animation: "fade", animationDuration: 100 }}
             />
           </Stack>
         </BottomSheetModalProvider>

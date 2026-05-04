@@ -125,21 +125,21 @@ const Appear = ({
   delay?: number;
 }) => {
   const op = useRef(new Animated.Value(0)).current;
-  const y  = useRef(new Animated.Value(12)).current;
+  const y  = useRef(new Animated.Value(6)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(op, {
         toValue: 1,
-        duration: 380,
-        delay,
+        duration: 200,
+        delay: Math.min(delay, 20),
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(y, {
         toValue: 0,
-        duration: 380,
-        delay,
+        duration: 200,
+        delay: Math.min(delay, 20),
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
@@ -167,15 +167,16 @@ const Spring = ({
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const pressIn  = () =>
-    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+    Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 120, bounciness: 0 }).start();
   const pressOut = () =>
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 120, bounciness: 0 }).start();
 
   return (
     <Pressable
       onPress={onPress}
       onPressIn={pressIn}
       onPressOut={pressOut}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
     >
       <Animated.View style={[{ transform: [{ scale }] }, style]}>
         {children}
@@ -326,7 +327,7 @@ const InputCell = ({
   const [focused, setFocused] = useState(false);
 
   return (
-    <Spring onPress={!editable ? () => { Haptics.selectionAsync(); onPress?.(); } : undefined} style={{ flex: 1 }}>
+    <Spring onPress={!editable ? () => { Haptics.selectionAsync(); onPress?.(); } : undefined} style={{ flex: 1, marginHorizontal: -8, paddingHorizontal: 8 }}>
       <View
         style={[
           styles.inputCell,
@@ -695,6 +696,7 @@ export default function CalculatorScreen() {
                 <Pressable
                   onPress={() => { Haptics.selectionAsync(); router.push("/(tabs)/plan"); }}
                   style={({ pressed }) => [styles.nextCard, pressed && { opacity: 0.75 }]}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
                   <View>
                     <Text style={styles.nextLabel}>NEXT UP</Text>
@@ -745,6 +747,7 @@ export default function CalculatorScreen() {
               <Pressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/(tabs)/plan"); }}
                 style={({ pressed }) => [styles.noPlanRow, pressed && { opacity: 0.7 }]}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <TrendingUp size={16} color={T.ink60} strokeWidth={1.5} />
                 <Text style={styles.noPlanText}>Create a training plan</Text>

@@ -14,6 +14,7 @@ import {
   ImageBackground,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as NavigationBar from 'expo-navigation-bar';
 import {
   ArrowRight,
   Activity,
@@ -163,6 +164,37 @@ export default function UltimateOnboarding() {
     goal: 'Endurance', frequency: '4x',
   });
 
+  /* ── Hide Android navigation bar completely on mount ── */
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    
+    const hideNavBar = async () => {
+      try {
+        // Set immersive mode to hide nav bar completely
+        await NavigationBar.setImmersiveAsync(true);
+        await NavigationBar.setVisibilityAsync('hidden');
+        await NavigationBar.setBehaviorAsync('overlay-swipe'); // swipe to reveal, stays hidden otherwise
+      } catch (e) {
+        console.warn('NavigationBar error:', e);
+      }
+    };
+    
+    hideNavBar();
+    
+    return () => {
+      // Restore normal behavior when leaving onboarding
+      const restoreNavBar = async () => {
+        try {
+          await NavigationBar.setImmersiveAsync(false);
+          await NavigationBar.setVisibilityAsync('visible');
+        } catch (e) {
+          console.warn('NavigationBar restore error:', e);
+        }
+      };
+      restoreNavBar();
+    };
+  }, []);
+
   /* ── Navigation guards ──
      isTransitioning blocks rapid double-taps that caused
      the original to occasionally skip a step or glitch. */
@@ -236,7 +268,11 @@ export default function UltimateOnboarding() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar 
+          barStyle="dark-content" 
+          backgroundColor="transparent" 
+          translucent 
+        />
 
         {/* ═══════════════════════════════════
             SPLASH
@@ -245,7 +281,7 @@ export default function UltimateOnboarding() {
           <ImageBackground
             source={{ uri: 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070' }}
             style={StyleSheet.absoluteFillObject}
-            imageStyle={{ opacity: 0.4 }}
+            imageStyle={{ opacity: 0.25 }}
           />
           <SafeAreaView style={styles.splashContent}>
             {/* Faster entry: delay cut, springify stiffness raised */}

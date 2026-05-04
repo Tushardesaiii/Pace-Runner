@@ -25,7 +25,7 @@
  *    - freezeOnBlur={true} — inactive screens stop rendering
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useMemo, memo } from "react";
 import { Tabs } from "expo-router";
 import {
   View,
@@ -70,41 +70,32 @@ const TABS = [
    — active pill indicator
    — large hit area so first tap always registers
 ───────────────────────────────────────────────────────── */
-const TabButton = ({ label, Icon, isFocused, onPress, onLongPress }) => {
-  const scale   = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
+const TabButton = memo(({
+  label,
+  Icon,
+  isFocused,
+  onPress,
+  onLongPress,
+}) => {
+  const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 0.88,
-        tension: 300,
-        friction: 18,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0.7,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    Animated.spring(scale, {
+      toValue: 0.92,
+      speed: 80,    // faster response
+      bounciness: 5, // less bouncy
+      useNativeDriver: true,
+    }).start();
+  }, [scale]);
 
   const handlePressOut = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 300,
-        friction: 18,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    Animated.spring(scale, {
+      toValue: 1,
+      speed: 80,
+      bounciness: 5,
+      useNativeDriver: true,
+    }).start();
+  }, [scale]);
 
   return (
     <Pressable
@@ -113,19 +104,16 @@ const TabButton = ({ label, Icon, isFocused, onPress, onLongPress }) => {
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       style={styles.tabBtn}
-      // Large hit slop — key fix for "need to press twice"
-      hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
-      android_ripple={null} // disable ripple — we do our own feedback
+      hitSlop={{ top: 12, bottom: 12, left: 14, right: 14 }}
+      android_ripple={null}
     >
       <Animated.View
         style={[
           styles.tabInner,
-          { transform: [{ scale }], opacity },
+          { transform: [{ scale }] },
         ]}
       >
-        {/* Active pill background */}
         {isFocused && <View style={styles.activePill} />}
-
         <Icon
           size={22}
           strokeWidth={isFocused ? 2.2 : 1.8}
@@ -144,13 +132,33 @@ const TabButton = ({ label, Icon, isFocused, onPress, onLongPress }) => {
       </Animated.View>
     </Pressable>
   );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if focused status or callback changes
+  return prevProps.isFocused === nextProps.isFocused &&
+         prevProps.onPress === nextProps.onPress &&
+         prevProps.onLongPress === nextProps.onLongPress;
+});
 
-/* ─────────────────────────────────────────────────────────
-   CUSTOM TAB BAR
-───────────────────────────────────────────────────────── */
-const CustomTabBar = ({ state, descriptors, navigation }) => {
+const CustomTabBar = memo(({
+  state,
+  descriptors,
+  navigation,
+}) => {
   const insets = useSafeAreaInsets();
+
+  // Memoize routes to prevent unnecessary renders
+  const routes = useMemo(() =>
+    state.routes.map((route, index) => {
+      const tab = TABS.find((t) => t.name === route.name);
+      return {
+        route,
+        index,
+        tab,
+        isFocused: state.index === index,
+      };
+    }).filter((r) => r.tab !== undefined),
+    [state.routes, state.index]
+  );
 
   return (
     <View
@@ -158,41 +166,34 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
         styles.bar,
         {
           paddingBottom: Platform.OS === "ios"
-            ? Math.max(insets.bottom, 8)  // respect home indicator
+            ? Math.max(insets.bottom, 8)
             : 10,
         },
       ]}
     >
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const isFocused   = state.index === index;
-        const tab         = TABS.find((t) => t.name === route.name);
-
-        if (!tab) return null;
-
+      {routes.map((routeData) => {
         const onPress = () => {
           const event = navigation.emit({
             type: "tabPress",
-            target: route.key,
+            target: routeData.route.key,
             canPreventDefault: true,
           });
 
-          if (!isFocused && !event.defaultPrevented) {
-            // navigate without resetting the stack if already on tab
-            navigation.navigate({ name: route.name, merge: true });
+          if (!routeData.isFocused && !event.defaultPrevented) {
+            navigation.navigate({ name: routeData.route.name, merge: true });
           }
         };
 
         const onLongPress = () => {
-          navigation.emit({ type: "tabLongPress", target: route.key });
+          navigation.emit({ type: "tabLongPress", target: routeData.route.key });
         };
 
         return (
           <TabButton
-            key={route.key}
-            label={tab.label}
-            Icon={tab.Icon}
-            isFocused={isFocused}
+            key={routeData.route.key}
+            label={routeData.tab.label}
+            Icon={routeData.tab.Icon}
+            isFocused={routeData.isFocused}
             onPress={onPress}
             onLongPress={onLongPress}
           />
@@ -200,7 +201,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
       })}
     </View>
   );
-};
+});
 
 /* ─────────────────────────────────────────────────────────
    TAB LAYOUT
@@ -208,13 +209,13 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 export default function TabLayout() {
   return (
     <Tabs
-      // Performance flags
       screenOptions={{
         headerShown: false,
-        // These three kill the most common source of tab lag:
-        lazy: true,                  // don't mount screens until visited
-        freezeOnBlur: true,          // pause rendering on inactive screens
-        detachInactiveScreens: true, // remove inactive screens from GPU layer
+        lazy: true,
+        freezeOnBlur: true,
+        detachInactiveScreens: true,
+        animationEnabled: true,
+        animationTypeForReplace: "pop",
       }}
       tabBar={(props) => <CustomTabBar {...props} />}
     >
@@ -256,18 +257,18 @@ const styles = StyleSheet.create({
 
   /* EACH TAB BUTTON */
   tabBtn: {
-    flex:            1,
-    alignItems:      "center",
-    justifyContent:  "center",
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   tabInner: {
-    alignItems:     "center",
+    alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius:   12,
-    minWidth:       52,
-    position:       "relative",
+    borderRadius: 12,
+    minWidth: 56,
+    position: "relative",
   },
 
   /* ACTIVE PILL */

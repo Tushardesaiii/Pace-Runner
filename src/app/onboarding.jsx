@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
   StatusBar,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
@@ -262,7 +263,7 @@ export default function UltimateOnboarding() {
 
     const onKeyboardShow = (event) => {
       const keyboardHeight = event?.endCoordinates?.height ?? 0;
-      footerLift.value = withTiming(Math.max(keyboardHeight - 80, 0), {
+      footerLift.value = withTiming(Math.max(keyboardHeight - 140, 0), {
         duration: event?.duration > 10 ? event.duration : 220,
       });
     };
@@ -364,7 +365,13 @@ export default function UltimateOnboarding() {
             style={{ flex: 1 }}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           >
-            <Animated.View style={[styles.slider, sliderStyle]}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ flexGrow: 1 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Animated.View style={[styles.slider, sliderStyle]}>
 
               {/* ── PAGE 1: BIOMETRICS ── */}
               <View style={[styles.page, { marginLeft: W }]}>
@@ -526,7 +533,8 @@ export default function UltimateOnboarding() {
                 </View>
               </View>
 
-            </Animated.View>
+              </Animated.View>
+            </ScrollView>
           </KeyboardAvoidingView>
 
           {/* FOOTER CTA */}

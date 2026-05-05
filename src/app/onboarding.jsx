@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dimensions,
   Pressable,
@@ -110,7 +110,7 @@ const PremiumButton = ({ onPress, text, icon: Icon, isPrimary = true, style }) =
 ───────────────────────────────────────────────────────── */
 const CustomInput = ({
   label, placeholder, value, onChangeText,
-  keyboardType = 'default', unit, returnKeyType, onSubmitEditing, autoFocus,
+  keyboardType = 'default', unit, returnKeyType, onSubmitEditing, autoFocus, onFocus,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const focusAnim = useSharedValue(0);
@@ -137,7 +137,10 @@ const CustomInput = ({
           keyboardType={keyboardType}
           returnKeyType={returnKeyType ?? (keyboardType === 'numeric' ? 'done' : 'next')}
           onSubmitEditing={onSubmitEditing}
-          onFocus={() => setIsFocused(true)}
+          onFocus={() => {
+            setIsFocused(true);
+            onFocus?.();
+          }}
           onBlur={() => setIsFocused(false)}
           autoFocus={autoFocus}
           blurOnSubmit={keyboardType === 'numeric'} // auto-dismiss on done for numeric
@@ -158,6 +161,7 @@ export default function UltimateOnboarding() {
   const [isTransitioning, setIsTransitioning] = useState(false); // guard against double-tap
   const scrollX = useSharedValue(0);
   const footerLift = useSharedValue(0);
+  const scrollRef = useRef(null);
 
   const [data, setData] = useState({
     name: '', age: '', weight: '', height: '',
@@ -366,6 +370,7 @@ export default function UltimateOnboarding() {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           >
             <ScrollView
+              ref={scrollRef}
               style={{ flex: 1 }}
               contentContainerStyle={{ flexGrow: 1 }}
               showsVerticalScrollIndicator={false}
@@ -479,6 +484,9 @@ export default function UltimateOnboarding() {
                       unit="bpm"
                       value={data.restingHr}
                       onChangeText={v => setData({ ...data, restingHr: v })}
+                      onFocus={() => {
+                        scrollRef.current?.scrollTo({ y: 170, animated: true });
+                      }}
                     />
                     <View style={styles.infoRow}>
                       <Heart size={14} color="#717171" />

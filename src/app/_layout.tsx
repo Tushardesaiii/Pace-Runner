@@ -35,14 +35,15 @@
 
 import "../../globals.css";
 import { useAuth } from "@/utils/auth/useAuth";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, useFocusEffect } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Platform, StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as NavigationBar from "expo-navigation-bar";
+import { hideAsync, showAsync } from "expo-status-bar";
 import {
   useFonts,
   Poppins_400Regular,
@@ -120,13 +121,25 @@ export default function RootLayout() {
     initiate();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── 2. Android edge-to-edge navigation bar ── */
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    NavigationBar.setBackgroundColorAsync("transparent");
-    NavigationBar.setBehaviorAsync("overlay-swipe"); // truly edge-to-edge
-    NavigationBar.setButtonStyleAsync("dark");
-  }, []);
+  /* ── 2. Android immersive full-screen mode (on focus) ── */
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "android") return;
+
+      const enableImmersiveMode = async () => {
+        try {
+          await NavigationBar.setVisibilityAsync("hidden");
+          await NavigationBar.setBehaviorAsync("inset-swipe");
+          await NavigationBar.setPositionAsync("absolute");
+          await NavigationBar.setBackgroundColorAsync("#00000000");
+        } catch (e) {
+          console.warn("NavigationBar immersive setup error:", e);
+        }
+      };
+
+      enableImmersiveMode();
+    }, [])
+  );
 
   /* ── 3. Hide splash only when auth + fonts are both resolved ── */
   useEffect(() => {
@@ -151,17 +164,10 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <BottomSheetModalProvider>
           {/*
-            StatusBar: translucent + transparent lets content render
-            beneath it. Individual screens control barStyle via
-            <StatusBar barStyle="dark-content" /> — no need to set
-            globally here. Setting it globally can cause flicker
-            on screen transitions.
+            StatusBar: Hidden for immersive full-screen mode.
+            Individual screens can override if needed.
           */}
-          <StatusBar
-            translucent
-            backgroundColor="transparent"
-            barStyle="dark-content"
-          />
+          <StatusBar hidden={Platform.OS === "android"} />
 
           <Stack screenOptions={{ headerShown: false }}>
             {/*

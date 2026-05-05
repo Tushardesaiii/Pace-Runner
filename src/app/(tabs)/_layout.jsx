@@ -26,7 +26,7 @@
  */
 
 import { useCallback, useRef, useMemo, memo } from "react";
-import { Tabs } from "expo-router";
+import { Tabs, useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as NavigationBar from "expo-navigation-bar";
 import {
   Calculator,
   Calendar,
@@ -207,6 +208,26 @@ const CustomTabBar = memo(({
    TAB LAYOUT
 ───────────────────────────────────────────────────────── */
 export default function TabLayout() {
+  /* ── Maintain immersive mode on tab navigation ── */
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "android") return;
+
+      const enableImmersiveMode = async () => {
+        try {
+          await NavigationBar.setVisibilityAsync("hidden");
+          await NavigationBar.setBehaviorAsync("inset-swipe");
+          await NavigationBar.setPositionAsync("absolute");
+          await NavigationBar.setBackgroundColorAsync("#00000000");
+        } catch (e) {
+          console.warn("NavigationBar immersive setup error:", e);
+        }
+      };
+
+      enableImmersiveMode();
+    }, [])
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -217,6 +238,7 @@ export default function TabLayout() {
         animationEnabled: true,
         animationTypeForReplace: "pop",
       }}
+      initialRouteName="plan"
       tabBar={(props) => <CustomTabBar {...props} />}
     >
       {TABS.map((tab) => (

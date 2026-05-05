@@ -226,11 +226,15 @@ export default function UltimateOnboarding() {
     }
 
     goTo(step + 1);
+    // Reset scroll to top when moving to next slide
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, [step, goTo]);
 
   const back = useCallback(() => {
     Haptics.selectionAsync();
     goTo(Math.max(0, step - 1));
+    // Reset scroll to top when going back
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, [step, goTo]);
 
   /* ── Slide animation ── */
@@ -372,9 +376,10 @@ export default function UltimateOnboarding() {
             <ScrollView
               ref={scrollRef}
               style={{ flex: 1 }}
-              contentContainerStyle={{ flexGrow: 1 }}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 280 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              scrollEventThrottle={16}
             >
               <Animated.View style={[styles.slider, sliderStyle]}>
 
@@ -485,7 +490,7 @@ export default function UltimateOnboarding() {
                       value={data.restingHr}
                       onChangeText={v => setData({ ...data, restingHr: v })}
                       onFocus={() => {
-                        scrollRef.current?.scrollTo({ y: 170, animated: true });
+                        scrollRef.current?.scrollTo({ y: 320, animated: true });
                       }}
                     />
                     <View style={styles.infoRow}>

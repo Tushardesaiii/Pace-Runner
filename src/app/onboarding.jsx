@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  TouchableWithoutFeedback,
   ImageBackground,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -157,6 +156,7 @@ export default function UltimateOnboarding() {
   const [step, setStep] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false); // guard against double-tap
   const scrollX = useSharedValue(0);
+  const footerLift = useSharedValue(0);
 
   const [data, setData] = useState({
     name: '', age: '', weight: '', height: '',
@@ -248,10 +248,39 @@ export default function UltimateOnboarding() {
 
   const footerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollX.value, [0, W * 0.4], [0, 1], Extrapolation.CLAMP),
+  }));
+
+  const footerButtonStyle = useAnimatedStyle(() => ({
     transform: [{
-      translateY: interpolate(scrollX.value, [0, W * 0.4], [12, 0], Extrapolation.CLAMP), // was 20
+      translateY: interpolate(scrollX.value, [0, W * 0.4], [12, 0], Extrapolation.CLAMP) - footerLift.value, // keep only the CTA above the keyboard
     }],
   }));
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvent = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+
+    const onKeyboardShow = (event) => {
+      const keyboardHeight = event?.endCoordinates?.height ?? 0;
+      footerLift.value = withTiming(Math.max(keyboardHeight - 80, 0), {
+        duration: event?.duration > 10 ? event.duration : 220,
+      });
+    };
+
+    const onKeyboardHide = (event) => {
+      footerLift.value = withTiming(0, {
+        duration: event?.duration > 10 ? event.duration : 220,
+      });
+    };
+
+    const showSubscription = Keyboard.addListener(showEvent, onKeyboardShow);
+    const hideSubscription = Keyboard.addListener(hideEvent, onKeyboardHide);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [footerLift]);
 
   const indicators = (
     <View style={styles.indicatorContainer}>
@@ -266,7 +295,7 @@ export default function UltimateOnboarding() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <Pressable onPress={Keyboard.dismiss} accessible={false} style={styles.container}>
       <View style={styles.container}>
         <StatusBar 
           barStyle="dark-content" 
@@ -502,13 +531,15 @@ export default function UltimateOnboarding() {
 
           {/* FOOTER CTA */}
           <Animated.View style={[styles.footer, footerStyle]}>
-            <PremiumButton
-              text={step === 3 ? 'Complete Profile' : 'Continue'}
-              icon={step === 3 ? Check : ArrowRight}
-              onPress={next}
-              // Visually dim if step 1 name is empty — soft signal, not a hard block
-              style={step === 1 && data.name.trim() === '' ? { opacity: 0.55 } : {}}
-            />
+            <Animated.View style={footerButtonStyle}>
+              <PremiumButton
+                text={step === 3 ? 'Complete Profile' : 'Continue'}
+                icon={step === 3 ? Check : ArrowRight}
+                onPress={next}
+                // Visually dim if step 1 name is empty — soft signal, not a hard block
+                style={step === 1 && data.name.trim() === '' ? { opacity: 0.55 } : {}}
+              />
+            </Animated.View>
             {/* Step counter — helps user know how far they are */}
             {step > 0 && step < 4 && (
               <Text style={styles.stepCounter}>Step {step} of 3</Text>
@@ -516,7 +547,7 @@ export default function UltimateOnboarding() {
           </Animated.View>
         </SafeAreaView>
       </View>
-    </TouchableWithoutFeedback>
+    </Pressable>
   );
 }
 

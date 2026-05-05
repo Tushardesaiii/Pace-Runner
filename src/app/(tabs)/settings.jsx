@@ -192,7 +192,6 @@ const PlanCard = ({ label, price, period, highlight, badge, selected, onPress })
   }, [selected]);
 
   const borderColor = ring.interpolate({ inputRange: [0,1], outputRange: ["transparent", T.accent] });
-  const borderWidth = ring.interpolate({ inputRange: [0,1], outputRange: [0, 2] });
 
   return (
     <Pressable onPress={onPress}>
@@ -200,7 +199,11 @@ const PlanCard = ({ label, price, period, highlight, badge, selected, onPress })
         style={[
           s.planCard,
           highlight && s.planDark,
-          { transform: [{ scale }], borderColor, borderWidth },
+          {
+            transform: [{ scale }],
+            borderColor,
+            borderWidth: selected ? 2 : 0,
+          },
         ]}
       >
         <View style={{ flex: 1 }}>
